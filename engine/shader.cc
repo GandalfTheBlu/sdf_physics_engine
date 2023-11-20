@@ -127,33 +127,39 @@ namespace Engine
 		glUniform1f(nameToLocation[name], value);
 	}
 
-	void Shader::SetVec2(const std::string& name, const GLfloat* valuePtr)
+	void Shader::SetInt(const std::string& name, GLint value)
 	{
 		AddLocationIfNeeded(name);
-		glUniform2fv(nameToLocation[name], 1, valuePtr);
+		glUniform1i(nameToLocation[name], value);
 	}
 
-	void Shader::SetVec3(const std::string& name, const GLfloat* valuePtr)
+	void Shader::SetVec2(const std::string& name, const GLfloat* valuePtr, GLsizei count)
 	{
 		AddLocationIfNeeded(name);
-		glUniform3fv(nameToLocation[name], 1, valuePtr);
+		glUniform2fv(nameToLocation[name], count, valuePtr);
 	}
 
-	void Shader::SetVec4(const std::string& name, const GLfloat* valuePtr)
+	void Shader::SetVec3(const std::string& name, const GLfloat* valuePtr, GLsizei count)
 	{
 		AddLocationIfNeeded(name);
-		glUniform4fv(nameToLocation[name], 1, valuePtr);
+		glUniform3fv(nameToLocation[name], count, valuePtr);
 	}
 
-	void Shader::SetMat3(const std::string& name, const GLfloat* valuePtr)
+	void Shader::SetVec4(const std::string& name, const GLfloat* valuePtr, GLsizei count)
 	{
 		AddLocationIfNeeded(name);
-		glUniformMatrix3fv(this->nameToLocation[name], 1, GL_FALSE, valuePtr);
+		glUniform4fv(nameToLocation[name], count, valuePtr);
 	}
 
-	void Shader::SetMat4(const std::string& name, const GLfloat* valuePtr)
+	void Shader::SetMat3(const std::string& name, const GLfloat* valuePtr, GLsizei count)
 	{
 		AddLocationIfNeeded(name);
-		glUniformMatrix4fv(this->nameToLocation[name], 1, GL_FALSE, valuePtr);
+		glUniformMatrix3fv(this->nameToLocation[name], count, GL_FALSE, valuePtr);
+	}
+
+	void Shader::SetMat4(const std::string& name, const GLfloat* valuePtr, GLsizei count)
+	{
+		AddLocationIfNeeded(name);
+		glUniformMatrix4fv(this->nameToLocation[name], count, GL_FALSE, valuePtr);
 	}
 }

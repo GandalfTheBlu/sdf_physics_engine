@@ -106,4 +106,19 @@ namespace Engine
 		accumilatedTorque = glm::vec3(0.f);
 		accumilatedResponseTranslation = glm::vec3(0.f);
 	}
+
+	glm::mat3 Rigidbody::SphereInertiaTensor(float radius, float mass)
+	{
+		return glm::mat3((2.f / 5.f) * mass * radius * radius);
+	}
+
+	glm::mat3 Rigidbody::CylinderInertiaTensor(float radius, float height, float mass)
+	{
+		float r2 = radius * radius;
+		float h2 = height * height;
+		float a = (1.f / 12.f) * mass * (3 * r2 + h2);
+		float b = 0.5f * mass * r2;
+
+		return glm::mat3(a, 0.f, 0.f, 0.f, b, 0.f, 0.f, 0.f, a);
+	}
 }

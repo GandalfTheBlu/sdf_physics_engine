@@ -1,28 +1,31 @@
 #pragma once
-#include <vec3.hpp>
-#include <gtc/quaternion.hpp>
+#include "sdf.h"
+#include "hit_result.h"
+#include <matrix.hpp>
 
 namespace Engine
 {
-	struct HitResult
+	struct AABB
 	{
-		glm::vec3 point;
-		glm::vec3 normal;
-		float distance;
+		glm::vec3 min;
+		glm::vec3 max;
 
-		HitResult();
+		AABB();
 	};
 
 	class Collider
 	{
 	public:
-		glm::vec3 position;
-		glm::quat rotation;
-
 		Collider();
 
-		virtual bool IntersectsSDF(float(*sdf)(const glm::vec3&), HitResult& outHitResult) = 0;
-		float (*ShapeSDF)(Collider*, const glm::vec3&);
+		AABB worldAABB;
+		glm::mat4 localMatrix;
+		glm::mat4 worldMatrix;
+		SDF sdf;
+
+		virtual void UpdateWorldAABB() = 0;
+		virtual bool IntersectsSDF(const SDF& otherSDF, HitResult& outHitResult) const = 0;
+		virtual bool IntersectsRay(const glm::vec3& origin, const glm::vec3& direction, HitResult& outHitResult) const = 0;
 	};
 
 	class SphereCollider final : public Collider
@@ -32,21 +35,21 @@ namespace Engine
 
 		SphereCollider();
 
-		virtual bool IntersectsSDF(float(*sdf)(const glm::vec3&), HitResult& outHitReslut) override;
+		virtual void UpdateWorldAABB() override;
+		virtual bool IntersectsSDF(const SDF& otherSDF, HitResult& outHitReslut) const override;
+		virtual bool IntersectsRay(const glm::vec3& origin, const glm::vec3& direction, HitResult& outHitResult) const override;
 	};
 
-	glm::vec3 CalcNormal(Collider* p_collider, const glm::vec3& p);
-	glm::vec3 CalcNormal(float(*sdf)(const glm::vec3&), const glm::vec3& p);
+	class CapsuleCollider final : public Collider
+	{
+	public:
+		float radius;
+		float height;
 
-	inline HitResult::HitResult() :
-		point(0.f),
-		normal(0.f),
-		distance(0.f)
-	{}
+		CapsuleCollider();
 
-	inline Collider::Collider() :
-		position(0.f),
-		rotation(glm::identity<glm::quat>()),
-		ShapeSDF(nullptr)
-	{}
+		virtual void UpdateWorldAABB() override;
+		virtual bool IntersectsSDF(const SDF& otherSDF, HitResult& outHitReslut) const override;
+		virtual bool IntersectsRay(const glm::vec3& origin, const glm::vec3& direction, HitResult& outHitResult) const override;
+	};
 }

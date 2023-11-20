@@ -1,4 +1,5 @@
 #include "physics_world.h"
+#include <map>
 #include <gtx/matrix_cross_product.hpp>
 
 namespace Engine
@@ -8,6 +9,68 @@ namespace Engine
 		worldPhysicsMaterial({0.f, 0.f}),
 		gravity(0.f)
 	{}
+
+	void PhysicsWorld::FindAabbIntersections()
+	{
+		aabbIntersections.clear();
+
+		constexpr size_t sweepAxis = 0;
+		constexpr size_t secondaryAxis1 = 1;
+		constexpr size_t secondaryAxis2 = 2;
+
+		std::multimap<float, EventPoint> events;
+		std::unordered_map<size_t, EventPoint*> activeSet;// key = event point's pair-id
+
+		// sort "events" (where an aabb has a min or max value on the axis)
+		// inserting into map based on distance on axis grants sorted order
+		// insertion should be log(N)
+		size_t pairId = 0;
+		for (PhysicsObject& object : objects)
+		{
+			for (size_t i = 0; i < object.colliders.size(); i++)
+			{
+				events.insert({ object.colliders[i]->worldAABB.min[sweepAxis], {EventPoint::Type::E_Start, pairId, &object, i} });
+				events.insert({ object.colliders[i]->worldAABB.max[sweepAxis], {EventPoint::Type::E_End, pairId, &object, i} });
+				pairId++;
+			}
+		}
+
+		// move plane from min to max and find overlaps in the axis direction
+		for (auto eventItr = events.begin(); eventItr != events.end(); eventItr++)
+		{
+			size_t nextPairId = eventItr->second.pairId;
+			EventPoint* p_nextEvent = &eventItr->second;
+
+			if (p_nextEvent->type == EventPoint::Type::E_End)
+				activeSet.erase(nextPairId);
+			else
+			{
+				for (auto& active : activeSet)
+				{
+					EventPoint* p_activeEvent = active.second;
+
+					if (p_activeEvent->p_object == p_nextEvent->p_object)
+						continue;// ignore self
+
+					// perform aabb vs aabb check along the remaining axis
+					const AABB& aabb1 = p_activeEvent->p_object->colliders[p_activeEvent->colliderIndex]->worldAABB;
+					const AABB& aabb2 = p_nextEvent->p_object->colliders[p_nextEvent->colliderIndex]->worldAABB;
+					if (aabb1.min[secondaryAxis1] <= aabb2.max[secondaryAxis1] && aabb1.max[secondaryAxis1] >= aabb2.min[secondaryAxis1] &&
+						aabb1.min[secondaryAxis2] <= aabb2.max[secondaryAxis2] && aabb1.max[secondaryAxis2] >= aabb2.min[secondaryAxis2])
+					{
+						aabbIntersections.push_back({
+							p_activeEvent->p_object,
+							p_activeEvent->colliderIndex,
+							p_nextEvent->p_object,
+							p_nextEvent->colliderIndex
+						});
+					}
+				}
+
+				activeSet.insert({ p_nextEvent->pairId, p_nextEvent });
+			}
+		}
+	}
 
 	glm::mat3 MakeContactMatrix(const glm::vec3& hitNormal)
 	{
@@ -163,108 +226,103 @@ namespace Engine
 		return impulse;
 	}
 
-	float PhysicsWorld::SdfObjects(const glm::vec3& point, PhysicsObject*& p_outClosest)
-	{
-		float closestDist = FLT_MAX;
-		for (PhysicsObject& object : objects)
-		{
-			float dist = object.p_collider->ShapeSDF(object.p_collider, point);
-			if (dist < closestDist)
-			{
-				closestDist = dist;
-				p_outClosest = &object;
-			}
-		}
-
-		return closestDist;
-	}
-
 	void PhysicsWorld::Init(float(*_worldSDF)(const glm::vec3&), const PhysicsMaterial& _worldPhysicsMaterial)
 	{
 		worldSDF = _worldSDF;
 		worldPhysicsMaterial = _worldPhysicsMaterial;
 	}
 
-	void PhysicsWorld::AddObject(Collider* p_collider, Rigidbody* p_rigidbody, const PhysicsMaterial& physicsMaterial)
+	void PhysicsWorld::AddObject(const std::vector<Collider*>& colliders, Rigidbody* p_rigidbody, const PhysicsMaterial& physicsMaterial)
 	{
-		p_rigidbody->centerOfMass = p_collider->position;
-		p_rigidbody->rotation = p_collider->rotation;
-		objects.push_back({ p_collider, p_rigidbody, physicsMaterial });
+		objects.push_back({ colliders, p_rigidbody, physicsMaterial });
 	}
 
 	PhysicsObject* PhysicsWorld::RaycastObjects(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, HitResult& outHitResult)
 	{
-		const float infinity = FLT_MAX;
-		const float minRadius = 0.001f;
+		PhysicsObject* p_closestObj = nullptr;
 
-		PhysicsObject* p_closestObject = nullptr;
-
-		float t = 0.f;
-		float stepScale = 1.2;
-		float prevRadius = 0.;
-		float stepLength = 0.;
-
-		for (int i = 0; i < 100; i++)
+		for (PhysicsObject& object : objects)
 		{
-			PhysicsObject* p_object = nullptr;
-			float signedRadius = SdfObjects(origin + direction * t, p_object);
-			float radius = abs(signedRadius);
-
-			bool longStepFail = stepScale > 1.f && (radius + prevRadius) < stepLength;
-
-			if (longStepFail)
+			for (Collider* p_collider : object.colliders)
 			{
-				stepLength -= stepScale * stepLength;
-				stepScale = 1.f;
+				HitResult hit;
+				if (p_collider->IntersectsRay(origin, direction, hit) && hit.distance < maxDistance)
+				{
+					maxDistance = hit.distance;
+					outHitResult = hit;
+					p_closestObj = &object;
+				}
 			}
-			else
-			{
-				stepLength = signedRadius * stepScale;
-			}
-
-			prevRadius = radius;
-
-			if (radius < minRadius)
-			{
-				p_closestObject = p_object;
-				break;
-			}
-
-			if (!longStepFail && t > maxDistance)
-				break;
-
-			t += stepLength;
 		}
 
-		if (t > maxDistance)
-			return nullptr;
+		return p_closestObj;
+	}
 
-		outHitResult.point = origin + direction * t;
-		outHitResult.normal = CalcNormal(p_closestObject->p_collider, outHitResult.point);
-		outHitResult.distance = t;
+	void PhysicsWorld::Start()
+	{
+		for (PhysicsObject& object : objects)
+		{
+			glm::mat4 rbWorldMatrix = glm::mat4_cast(object.p_rigidbody->rotation);
+			rbWorldMatrix[3] = glm::vec4(object.p_rigidbody->centerOfMass, 1.f);
 
-		return p_closestObject;
+			for (Collider* p_collider : object.colliders)
+			{
+				p_collider->worldMatrix = rbWorldMatrix * p_collider->localMatrix;
+				p_collider->UpdateWorldAABB();
+			}
+		}
 	}
 
 	void PhysicsWorld::Update(float deltaTime)
 	{
+		FindAabbIntersections();
+
 		collisions.clear();
 
-		for (PhysicsObject& object : objects)
+		// object vs object
+		for (AabbIntersection& intersection : aabbIntersections)
 		{
+			Collider* p_firstCollider = intersection.p_firstObject->colliders[intersection.firstColliderIndex];
+			Collider* p_secondCollider = intersection.p_secondObject->colliders[intersection.secondColliderIndex];
+
 			HitResult hit;
-			if (object.p_collider->IntersectsSDF(worldSDF, hit))
+			if (p_firstCollider->IntersectsSDF(p_secondCollider->sdf, hit))
 			{
 				glm::vec3 impulse = CalculateImpulseResponse(
 					hit.point,
-					hit.normal, 
-					object.p_rigidbody,
-					nullptr, 
-					object.physicsMaterial, 
-					worldPhysicsMaterial
+					hit.normal,
+					intersection.p_firstObject->p_rigidbody,
+					intersection.p_secondObject->p_rigidbody,
+					intersection.p_firstObject->physicsMaterial,
+					intersection.p_secondObject->physicsMaterial
 				);
 
-				collisions.push_back({ &object, hit.point, impulse, hit.normal * hit.distance });
+				glm::vec3 overlap = hit.normal * hit.distance * 0.5f;
+
+				collisions.push_back({ intersection.p_firstObject, hit.point, -impulse, overlap });
+				collisions.push_back({ intersection.p_secondObject, hit.point, impulse, -overlap });
+			}
+		}
+
+		// object vs world
+		for (PhysicsObject& object : objects)
+		{
+			for (Collider* p_collider : object.colliders)
+			{
+				HitResult hit;
+				if (p_collider->IntersectsSDF(worldSDF, hit))
+				{
+					glm::vec3 impulse = CalculateImpulseResponse(
+						hit.point,
+						hit.normal,
+						object.p_rigidbody,
+						nullptr,
+						object.physicsMaterial,
+						worldPhysicsMaterial
+					);
+
+					collisions.push_back({ &object, hit.point, impulse, hit.normal * hit.distance });
+				}
 			}
 		}
 
@@ -278,8 +336,15 @@ namespace Engine
 		{
 			object.p_rigidbody->AddGravityForce(gravity);
 			object.p_rigidbody->Integrate(deltaTime);
-			object.p_collider->position = object.p_rigidbody->centerOfMass;
-			object.p_collider->rotation = object.p_rigidbody->rotation;
+
+			glm::mat4 rbWorldMatrix = glm::mat4_cast(object.p_rigidbody->rotation);
+			rbWorldMatrix[3] = glm::vec4(object.p_rigidbody->centerOfMass, 1.f);
+
+			for (Collider* p_collider : object.colliders)
+			{
+				p_collider->worldMatrix = rbWorldMatrix * p_collider->localMatrix;
+				p_collider->UpdateWorldAABB();
+			}
 		}
 	}
 }

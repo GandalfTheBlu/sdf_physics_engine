@@ -1,9 +1,15 @@
 #version 430
 
+#define MAX_SPHERES 10
+#define MAX_CAPSULES 10
+
 uniform mat4 u_invVP;
 uniform vec3 u_camPos;
 uniform float u_pixelRadius;
-uniform vec4 u_spherePosRadius;
+uniform vec4 u_spheres[MAX_SPHERES];
+uniform int u_sphereCount;
+uniform vec4 u_capsules[MAX_CAPSULES * 2];
+uniform int u_capsuleCount;
 
 layout(location=0) in vec2 v_position;
 
@@ -18,19 +24,36 @@ vec3 ScreenRay()
 	return normalize(vec3(farPos - nearPos));
 }
 
-
 float SmoothUnion(float d1, float d2, float k) 
 {
-    float h = clamp(0.5 + 0.5*(d2-d1)/k, 0.0, 1.0);
-    return mix(d2, d1, h) - k*h*(1.0-h); 
+    float h = clamp(0.5 + 0.5*(d2-d1)/k, 0., 1.);
+    return mix(d2, d1, h) - k*h*(1.-h); 
+}
+
+float Capsule(vec3 p, vec3 a, vec3 b, float r)
+{
+	vec3 pa = p - a;
+	vec3 ba = b - a;
+	float h = clamp(dot(pa, ba) / dot(ba, ba), 0., 1.);
+	return length(pa - ba * h) - r;
 }
 
 float Sdf(vec3 p)
 {
-	vec3 q = p - u_spherePosRadius.xyz;
-	float sphere = length(q) - u_spherePosRadius.w;
+	float spheres = 100000.f;
+	for(int i=0; i<u_sphereCount; i++)
+		spheres = min(spheres, distance(u_spheres[i].xyz, p) - u_spheres[i].w);
+	
+	float capsules = 100000.f;
+	for(int i=0; i+1<u_capsuleCount * 2; i+=2)
+	{
+		vec4 aAndR = u_capsules[i];
+		vec3 b = u_capsules[i+1].xyz;
+		capsules = min(capsules, Capsule(p, aAndR.xyz, b, aAndR.w));
+	}
+	
 	float plane = p.y + 0.3 * sin(p.x) * sin(p.z);
-	return SmoothUnion(sphere, plane, 2.);
+	return min(min(spheres, capsules), plane);
 }
 
 vec3 CalcNormal(vec3 p)
@@ -47,7 +70,7 @@ float SoftShadow(vec3 origin, vec3 ray, float minT, float maxT, float k)
 {
     float res = 1.0;
     float t = minT;
-    for(float i=0.; i<100. && t<maxT; i++)
+    for(int i=0; i<100 && t<maxT; i++)
     {
         float h = Sdf(origin + ray * t);
         if(h<0.001)
@@ -73,7 +96,7 @@ float RayMarch(vec3 origin, vec3 ray)
 	float candidateT = minT;
 	float candidateError = infinity;
 	
-	for(float i=0.; i<100.; i++)
+	for(int i=0; i<100; i++)
 	{
 		float signedRadius = Sdf(origin + ray * t);
 		float radius = abs(signedRadius);

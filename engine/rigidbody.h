@@ -35,5 +35,8 @@ namespace Engine
 		void AddCollisionResponseTranslation(const glm::vec3& responseTranslation);
 
 		void Integrate(float deltaTime);
+
+		static glm::mat3 SphereInertiaTensor(float radius, float mass);
+		static glm::mat3 CylinderInertiaTensor(float radius, float height, float mass);
 	};
 }

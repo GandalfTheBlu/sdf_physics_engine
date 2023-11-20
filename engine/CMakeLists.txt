@@ -18,6 +18,9 @@ SET(engine_files
 	shader.cc
 	camera.h
 	camera.cc
+	sdf.h
+	sdf.cc
+	hit_result.h
 	collider.h
 	collider.cc
 	rigidbody.h

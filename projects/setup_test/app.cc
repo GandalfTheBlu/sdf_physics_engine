@@ -34,15 +34,7 @@ void App_SetupTest::UpdateLoop()
 	float camXAngleMove = 0.f;
 	float sensitivity = 0.3f;
 
-	Engine::SphereCollider sphere;
-	sphere.position = glm::vec3(0.f, 6.f, 3.f);
-	sphere.radius = 1.f;
-
-	Engine::Rigidbody rb;
-	rb.SetMass(100.f);
-	rb.SetInertiaTensor(glm::mat3((2.f / 5.f) * 100.f * 1.f * 1.f));
-
-	auto worldSDF = [](const glm::vec3& p) 
+	auto worldSDF = [](const glm::vec3& p)
 	{
 		return p.y + 0.3f * glm::sin(p.x) * glm::sin(p.z);
 	};
@@ -50,7 +42,58 @@ void App_SetupTest::UpdateLoop()
 	Engine::PhysicsWorld physWorld;
 	physWorld.Init(worldSDF, { 0.5f, 0.4f });
 	physWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
-	physWorld.AddObject(&sphere, &rb, { 1.f, 0.4f });
+
+	struct Sphere
+	{
+		Engine::Rigidbody rb;
+		Engine::SphereCollider collider;
+	};
+
+	struct Capsule
+	{
+		Engine::Rigidbody rb;
+		Engine::CapsuleCollider collider;
+	};
+
+	constexpr size_t sphereCount = 10;
+	Sphere spheres[sphereCount];
+
+	for (size_t i = 0; i < sphereCount; i++)
+	{
+		float mass = 100.f;
+		float radius = 1.f;
+
+		Engine::Rigidbody& rb = spheres[i].rb;
+		rb.centerOfMass = glm::vec3((float)i * 3.f, 6.f, 6.f);
+		rb.SetMass(mass);
+		rb.SetInertiaTensor(Engine::Rigidbody::SphereInertiaTensor(radius, mass));
+
+		spheres[i].collider.radius = radius;
+
+		physWorld.AddObject({ &spheres[i].collider }, &rb, {1.f, 0.4f});
+	}
+
+	constexpr size_t capsuleCount = 1;
+	Capsule capsules[capsuleCount];
+
+	for (size_t i = 0; i < capsuleCount; i++)
+	{
+		float mass = 100.f;
+		float radius = 1.f;
+		float height = 2.f;
+
+		Engine::Rigidbody& rb = capsules[i].rb;
+		rb.centerOfMass = glm::vec3((float)i * 3.f, 6.f, 12.f);
+		rb.SetMass(mass);
+		rb.SetInertiaTensor(Engine::Rigidbody::CylinderInertiaTensor(radius, height + radius, mass));
+
+		capsules[i].collider.radius = radius;
+		capsules[i].collider.height = height;
+
+		physWorld.AddObject({ &capsules[i].collider }, &rb, { 1.f, 0.4f });
+	}
+
+	physWorld.Start();
 
 	float pixelRadius = 0.5f * glm::length(glm::vec2(1.f / window.Width(), 1.f / window.Height()));
 
@@ -137,13 +180,30 @@ void App_SetupTest::UpdateLoop()
 		}
 		
 
-		glm::vec4 sphereData(sphere.position, sphere.radius);
+		glm::vec4 spheresData[sphereCount];
+		
+		for(size_t i=0; i<sphereCount; i++)
+			spheresData[i] = glm::vec4(spheres[i].rb.centerOfMass, spheres[i].collider.radius);
+
+		glm::vec4 capsulesData[2 * capsuleCount];
+
+		for (size_t i = 0; i < capsuleCount; i++)
+		{
+			float h0 = capsules[i].collider.height * 0.5f;
+			glm::vec3 pa = capsules[i].collider.worldMatrix * glm::vec4(0.f, h0, 0.f, 1.f);
+			glm::vec3 pb = capsules[i].collider.worldMatrix * glm::vec4(0.f, -h0, 0.f, 1.f);
+			capsulesData[i * 2] = glm::vec4(pa, capsules[i].collider.radius);
+			capsulesData[i * 2 + 1] = glm::vec4(pb, 0.f);
+		}
 
 		sdfShader.Use();
 		sdfShader.SetMat4("u_invVP", &invVP[0][0]);
 		sdfShader.SetVec3("u_camPos", &camTransform[3][0]);
 		sdfShader.SetFloat("u_pixelRadius", pixelRadius);
-		sdfShader.SetVec4("u_spherePosRadius", &sphereData[0]);
+		sdfShader.SetVec4("u_spheres", &spheresData[0][0], sphereCount);
+		sdfShader.SetInt("u_sphereCount", sphereCount);
+		sdfShader.SetVec4("u_capsules", &capsulesData[0][0], capsuleCount * 2);
+		sdfShader.SetInt("u_capsuleCount", capsuleCount);
 		screenQuad.Bind();
 		screenQuad.Draw(0);
 		screenQuad.Unbind();

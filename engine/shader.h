@@ -25,10 +25,11 @@ namespace Engine
 		void StopUsing();
 
 		void SetFloat(const std::string& name, GLfloat value);
-		void SetVec2(const std::string& name, const GLfloat* valuePtr);
-		void SetVec3(const std::string& name, const GLfloat* valuePtr);
-		void SetVec4(const std::string& name, const GLfloat* valuePtr);
-		void SetMat3(const std::string& name, const GLfloat* valuePtr);
-		void SetMat4(const std::string& name, const GLfloat* valuePtr);
+		void SetInt(const std::string& name, GLint value);
+		void SetVec2(const std::string& name, const GLfloat* valuePtr, GLsizei count = 1);
+		void SetVec3(const std::string& name, const GLfloat* valuePtr, GLsizei count = 1);
+		void SetVec4(const std::string& name, const GLfloat* valuePtr, GLsizei count = 1);
+		void SetMat3(const std::string& name, const GLfloat* valuePtr, GLsizei count = 1);
+		void SetMat4(const std::string& name, const GLfloat* valuePtr, GLsizei count = 1);
 	};
 }
