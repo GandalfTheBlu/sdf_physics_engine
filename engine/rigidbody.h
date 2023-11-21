@@ -9,18 +9,18 @@ namespace Engine
 	public:
 		glm::vec3 centerOfMass;
 		glm::vec3 linearVelocity;
-		glm::vec3 accumilatedForce;
+		glm::vec3 accumulatedForce;
 		float inverseMass;
 		float linearDamping;
 
 		glm::quat rotation;
-		glm::quat angularVelocity;
-		glm::vec3 accumilatedTorque;
+		glm::vec3 angularVelocity;
+		glm::vec3 accumulatedTorque;
 		glm::mat3 localInverseInertiaTensor;
 		float angularDamping;
 
 		glm::mat3 worldInverseInertiaTensor;
-		glm::vec3 accumilatedResponseTranslation;
+		glm::vec3 accumulatedResponseTranslation;
 
 		Rigidbody();
 

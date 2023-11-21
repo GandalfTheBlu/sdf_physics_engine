@@ -153,7 +153,9 @@ void main()
 		vec3 f = fract(point);
 		float pattern = exp(-0.2*length(min(f, 1.-f)));
 		
-		col = vec3((diff + spec) * pattern * shadow);
+		vec3 amb = vec3(0.2, 0.2, 0.3);
+		
+		col = clamp(amb + vec3((diff + spec) * pattern * shadow), 0., 1.);
 	}
 	
 	o_color = vec4(col, 1.);

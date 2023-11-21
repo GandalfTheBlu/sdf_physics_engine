@@ -127,7 +127,7 @@ namespace Engine
 			glm::vec3(0.f)
 		};
 		glm::vec3 angularVel[2]{
-			glm::vec3(p_firstRb->angularVelocity.x, p_firstRb->angularVelocity.y, p_firstRb->angularVelocity.z),
+			p_firstRb->angularVelocity,
 			glm::vec3(0.f)
 		};
 		glm::vec3 pointVel[2]{
@@ -139,11 +139,7 @@ namespace Engine
 		if (p_optionalSecondRb != nullptr)
 		{
 			relativePoint[1] = hitPoint - p_optionalSecondRb->centerOfMass;
-			angularVel[1] = glm::vec3(
-				p_optionalSecondRb->angularVelocity.x,
-				p_optionalSecondRb->angularVelocity.y,
-				p_optionalSecondRb->angularVelocity.z
-			);
+			angularVel[1] = p_optionalSecondRb->angularVelocity;
 			pointVel[1] = p_optionalSecondRb->linearVelocity + glm::cross(angularVel[1], relativePoint[1]);
 			relativeVel = pointVel[1] - pointVel[0];
 		}
@@ -297,7 +293,7 @@ namespace Engine
 					intersection.p_secondObject->physicsMaterial
 				);
 
-				glm::vec3 overlap = hit.normal * hit.distance * 0.5f;
+				glm::vec3 overlap = hit.normal * (hit.distance * 0.5f);
 
 				collisions.push_back({ intersection.p_firstObject, hit.point, -impulse, overlap });
 				collisions.push_back({ intersection.p_secondObject, hit.point, impulse, -overlap });

@@ -73,14 +73,14 @@ void App_SetupTest::UpdateLoop()
 		physWorld.AddObject({ &spheres[i].collider }, &rb, {1.f, 0.4f});
 	}
 
-	constexpr size_t capsuleCount = 1;
+	constexpr size_t capsuleCount = 10;
 	Capsule capsules[capsuleCount];
 
 	for (size_t i = 0; i < capsuleCount; i++)
 	{
 		float mass = 100.f;
 		float radius = 1.f;
-		float height = 2.f;
+		float height = 4.f;
 
 		Engine::Rigidbody& rb = capsules[i].rb;
 		rb.centerOfMass = glm::vec3((float)i * 3.f, 6.f, 12.f);
