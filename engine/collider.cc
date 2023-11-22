@@ -98,7 +98,7 @@ namespace Engine
 		glm::vec3 ab = b - a;
 
 		float t = 0.f;
-		const float alpha = 0.5f;
+		const float alpha = 0.25f;
 		const float step = alpha * height / (2.f * radius);
 		glm::vec3 closestPoint(0.f);
 		float closestDist = radius;

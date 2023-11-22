@@ -38,22 +38,34 @@ float Capsule(vec3 p, vec3 a, vec3 b, float r)
 	return length(pa - ba * h) - r;
 }
 
+float Box(vec3 p, vec3 b)
+{
+	vec3 q = abs(p) - b;
+	return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.);
+}
+
+vec3 RepXZ(vec3 p, vec2 s)
+{
+	vec2 q = s * round(p.xz / s);
+	return p - vec3(q.x, 0., q.y);
+}
+
 float Sdf(vec3 p)
 {
-	float spheres = 100000.f;
-	for(int i=0; i<u_sphereCount; i++)
-		spheres = min(spheres, distance(u_spheres[i].xyz, p) - u_spheres[i].w);
+	float d = 100000.f;
 	
-	float capsules = 100000.f;
+	for(int i=0; i<u_sphereCount; i++)
+		d = min(d, distance(u_spheres[i].xyz, p) - u_spheres[i].w);
+	
 	for(int i=0; i+1<u_capsuleCount * 2; i+=2)
 	{
 		vec4 aAndR = u_capsules[i];
 		vec3 b = u_capsules[i+1].xyz;
-		capsules = min(capsules, Capsule(p, aAndR.xyz, b, aAndR.w));
+		d = min(d, Capsule(p, aAndR.xyz, b, aAndR.w));
 	}
 	
-	float plane = p.y + 0.3 * sin(p.x) * sin(p.z);
-	return min(min(spheres, capsules), plane);
+	float plane = min(p.y, Box(RepXZ(p, vec2(3.)), vec3(1.)));
+	return SmoothUnion(d, plane, 0.6);
 }
 
 vec3 CalcNormal(vec3 p)

@@ -207,7 +207,7 @@ namespace Engine
 		{
 			impulse.y /= planarImpulse;
 			impulse.z /= planarImpulse;
-
+		
 			impulse.x = deltaVelContact[0][0] +
 				deltaVelContact[0][1] * friction * impulse.y +
 				deltaVelContact[0][2] * friction * impulse.z;
@@ -271,6 +271,9 @@ namespace Engine
 
 	void PhysicsWorld::Update(float deltaTime)
 	{
+		for (PhysicsObject& object : objects)
+			object.p_rigidbody->ApplyGravity(gravity, deltaTime);
+
 		FindAabbIntersections();
 
 		collisions.clear();
@@ -317,7 +320,9 @@ namespace Engine
 						worldPhysicsMaterial
 					);
 
-					collisions.push_back({ &object, hit.point, impulse, hit.normal * hit.distance });
+					glm::vec3 overlap = hit.normal * hit.distance;
+
+					collisions.push_back({ &object, hit.point, impulse, overlap });
 				}
 			}
 		}
@@ -330,7 +335,6 @@ namespace Engine
 
 		for (PhysicsObject& object : objects)
 		{
-			object.p_rigidbody->AddGravityForce(gravity);
 			object.p_rigidbody->Integrate(deltaTime);
 
 			glm::mat4 rbWorldMatrix = glm::mat4_cast(object.p_rigidbody->rotation);

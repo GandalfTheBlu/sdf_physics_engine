@@ -29,7 +29,7 @@ namespace Engine
 
 		void AddForce(const glm::vec3& force);
 		void AddForceAtPoint(const glm::vec3& force, const glm::vec3& point);
-		void AddGravityForce(const glm::vec3& gravity);
+		void ApplyGravity(const glm::vec3& gravityAcceleration, float deltaTime);
 		void AddImpulse(const glm::vec3& impulse);
 		void AddImpulseAtPoint(const glm::vec3& impulse, const glm::vec3& point);
 		void AddCollisionResponseTranslation(const glm::vec3& responseTranslation);
@@ -38,5 +38,6 @@ namespace Engine
 
 		static glm::mat3 SphereInertiaTensor(float radius, float mass);
 		static glm::mat3 CylinderInertiaTensor(float radius, float height, float mass);
+		static glm::mat3 BoxInertiaTensor(const glm::vec3& size, float mass);
 	};
 }

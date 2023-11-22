@@ -15,6 +15,18 @@ void App_SetupTest::Init()
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
 }
 
+float Box(const glm::vec3& p, const glm::vec3& b)
+{
+	glm::vec3 q = glm::abs(p) - b;
+	return glm::length(glm::max(q, 0.f)) + glm::min(glm::max(q.x, glm::max(q.y, q.z)), 0.f);
+}
+
+glm::vec3 RepXZ(const glm::vec3& p, const glm::vec2& s)
+{
+	glm::vec2 q = s * glm::round(glm::vec2(p.x, p.z) / s);
+	return p - glm::vec3(q.x, 0.f, q.y);
+}
+
 void App_SetupTest::UpdateLoop()
 {
 	Engine::RenderMesh screenQuad;
@@ -36,11 +48,11 @@ void App_SetupTest::UpdateLoop()
 
 	auto worldSDF = [](const glm::vec3& p)
 	{
-		return p.y + 0.3f * glm::sin(p.x) * glm::sin(p.z);
+		return glm::min(p.y, Box(RepXZ(p, glm::vec2(3.f)), glm::vec3(1.)));
 	};
 
 	Engine::PhysicsWorld physWorld;
-	physWorld.Init(worldSDF, { 0.5f, 0.4f });
+	physWorld.Init(worldSDF, { 0.2f, 0.4f });
 	physWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 	struct Sphere
@@ -53,6 +65,13 @@ void App_SetupTest::UpdateLoop()
 	{
 		Engine::Rigidbody rb;
 		Engine::CapsuleCollider collider;
+	};
+
+	struct Cube
+	{
+		Engine::Rigidbody rb;
+		Engine::CapsuleCollider colliders[4];
+		float scale;
 	};
 
 	constexpr size_t sphereCount = 10;
@@ -70,7 +89,7 @@ void App_SetupTest::UpdateLoop()
 
 		spheres[i].collider.radius = radius;
 
-		physWorld.AddObject({ &spheres[i].collider }, &rb, {1.f, 0.4f});
+		physWorld.AddObject({ &spheres[i].collider }, &rb, {0.8f, 0.4f});
 	}
 
 	constexpr size_t capsuleCount = 10;
@@ -80,17 +99,18 @@ void App_SetupTest::UpdateLoop()
 	{
 		float mass = 100.f;
 		float radius = 1.f;
-		float height = 4.f;
+		float height = 2.f;
 
 		Engine::Rigidbody& rb = capsules[i].rb;
 		rb.centerOfMass = glm::vec3((float)i * 3.f, 6.f, 12.f);
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::CylinderInertiaTensor(radius, height + radius, mass));
+		rb.angularDamping = 0.9f;
 
 		capsules[i].collider.radius = radius;
 		capsules[i].collider.height = height;
-
-		physWorld.AddObject({ &capsules[i].collider }, &rb, { 1.f, 0.4f });
+		
+		physWorld.AddObject({ &capsules[i].collider }, &rb, { 0.8f, 0.4f });
 	}
 
 	physWorld.Start();
@@ -175,18 +195,16 @@ void App_SetupTest::UpdateLoop()
 			Engine::PhysicsObject* p_obj = physWorld.RaycastObjects(camPos, direction, 100.f, hit);
 			if (p_obj != nullptr)
 			{
-				p_obj->p_rigidbody->AddImpulseAtPoint(hit.normal * -1000.f, hit.point);
+				p_obj->p_rigidbody->AddImpulseAtPoint(direction * 500.f, hit.point);
 			}
 		}
 		
 
 		glm::vec4 spheresData[sphereCount];
-		
 		for(size_t i=0; i<sphereCount; i++)
 			spheresData[i] = glm::vec4(spheres[i].rb.centerOfMass, spheres[i].collider.radius);
 
 		glm::vec4 capsulesData[2 * capsuleCount];
-
 		for (size_t i = 0; i < capsuleCount; i++)
 		{
 			float h0 = capsules[i].collider.height * 0.5f;

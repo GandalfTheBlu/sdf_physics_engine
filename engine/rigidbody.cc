@@ -28,10 +28,10 @@ namespace Engine
 		accumulatedTorque += glm::cross(point - centerOfMass, force);
 	}
 
-	void Rigidbody::AddGravityForce(const glm::vec3& gravity)
+	void Rigidbody::ApplyGravity(const glm::vec3& gravityAcceleration, float deltaTime)
 	{
 		if (inverseMass != 0.f)
-			accumulatedForce += gravity / inverseMass;
+			linearVelocity += gravityAcceleration * deltaTime;
 	}
 
 	void Rigidbody::AddImpulse(const glm::vec3& impulse)
@@ -93,12 +93,11 @@ namespace Engine
 		// apply angular damping
 		angularVelocity *= glm::pow(1.f - glm::clamp(angularDamping, 0.f, 0.999f), fixedDeltaTime);
 
-		// update rotation based on angular velocity
+		// update rotation based on angular velocity and response rotation
 		rotation += (0.5f * fixedDeltaTime) * glm::quat(0.f, angularVelocity.x, angularVelocity.y, angularVelocity.z) * rotation;
 		rotation = glm::normalize(rotation);
 
-
-		// reset accumilators
+		// reset accumulators
 		accumulatedForce = glm::vec3(0.f);
 		accumulatedTorque = glm::vec3(0.f);
 		accumulatedResponseTranslation = glm::vec3(0.f);
@@ -113,9 +112,19 @@ namespace Engine
 	{
 		float r2 = radius * radius;
 		float h2 = height * height;
-		float a = (1.f / 12.f) * mass * (3 * r2 + h2);
+		float a = (1.f / 12.f) * mass * h2 + 0.25 * mass * r2;
 		float b = 0.5f * mass * r2;
-
+		
 		return glm::mat3(a, 0.f, 0.f, 0.f, b, 0.f, 0.f, 0.f, a);
+	}
+
+	glm::mat3 Rigidbody::BoxInertiaTensor(const glm::vec3& size, float mass)
+	{
+		float a = size.x * size.x;
+		float b = size.y * size.y;
+		float c = size.z * size.z;
+		float f = mass / 12.f;
+
+		return glm::mat3(f * (b + c), 0.f, 0.f, 0.f, f * (a + c), 0.f, 0.f, 0.f, f * (a + b));
 	}
 }
