@@ -40,4 +40,14 @@ namespace Engine
 	{
 		return glm::perspective(fovy, aspect, near, far);
 	}
+
+	float Camera::GetNearPlane() const
+	{
+		return near;
+	}
+
+	float Camera::GetFarPlane() const
+	{
+		return far;
+	}
 }

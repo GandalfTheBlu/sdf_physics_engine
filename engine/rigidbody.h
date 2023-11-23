@@ -22,6 +22,8 @@ namespace Engine
 		glm::mat3 worldInverseInertiaTensor;
 		glm::vec3 accumulatedResponseTranslation;
 
+		int constraints;
+
 		Rigidbody();
 
 		void SetMass(float mass);
@@ -33,6 +35,9 @@ namespace Engine
 		void AddImpulse(const glm::vec3& impulse);
 		void AddImpulseAtPoint(const glm::vec3& impulse, const glm::vec3& point);
 		void AddCollisionResponseTranslation(const glm::vec3& responseTranslation);
+
+		void SetLockPosition(bool flag);
+		void SetLockRotation(bool flag);
 
 		void Integrate(float deltaTime);
 

@@ -27,12 +27,9 @@ namespace Engine
 		size_t pairId = 0;
 		for (PhysicsObject& object : objects)
 		{
-			for (size_t i = 0; i < object.colliders.size(); i++)
-			{
-				events.insert({ object.colliders[i]->worldAABB.min[sweepAxis], {EventPoint::Type::E_Start, pairId, &object, i} });
-				events.insert({ object.colliders[i]->worldAABB.max[sweepAxis], {EventPoint::Type::E_End, pairId, &object, i} });
-				pairId++;
-			}
+			events.insert({ object.p_collider->worldAABB.min[sweepAxis], {EventPoint::Type::E_Start, pairId, &object} });
+			events.insert({ object.p_collider->worldAABB.max[sweepAxis], {EventPoint::Type::E_End, pairId, &object} });
+			pairId++;
 		}
 
 		// move plane from min to max and find overlaps in the axis direction
@@ -53,16 +50,14 @@ namespace Engine
 						continue;// ignore self
 
 					// perform aabb vs aabb check along the remaining axis
-					const AABB& aabb1 = p_activeEvent->p_object->colliders[p_activeEvent->colliderIndex]->worldAABB;
-					const AABB& aabb2 = p_nextEvent->p_object->colliders[p_nextEvent->colliderIndex]->worldAABB;
+					const AABB& aabb1 = p_activeEvent->p_object->p_collider->worldAABB;
+					const AABB& aabb2 = p_nextEvent->p_object->p_collider->worldAABB;
 					if (aabb1.min[secondaryAxis1] <= aabb2.max[secondaryAxis1] && aabb1.max[secondaryAxis1] >= aabb2.min[secondaryAxis1] &&
 						aabb1.min[secondaryAxis2] <= aabb2.max[secondaryAxis2] && aabb1.max[secondaryAxis2] >= aabb2.min[secondaryAxis2])
 					{
 						aabbIntersections.push_back({
 							p_activeEvent->p_object,
-							p_activeEvent->colliderIndex,
 							p_nextEvent->p_object,
-							p_nextEvent->colliderIndex
 						});
 					}
 				}
@@ -147,6 +142,10 @@ namespace Engine
 		// transform relative velocity to contact space
 		glm::vec3 contactVel = worldToContact * relativeVel;
 		float desiredNormalVelocity = -contactVel.x * (1.f + restitution);
+
+		if (desiredNormalVelocity < 0.f)
+			return glm::vec3(0.f);
+
 		float totalInverseMass = p_firstRb->inverseMass;
 
 		// build matrix that converts a unit of impulse to a unit of torque
@@ -228,30 +227,53 @@ namespace Engine
 		worldPhysicsMaterial = _worldPhysicsMaterial;
 	}
 
-	void PhysicsWorld::AddObject(const std::vector<Collider*>& colliders, Rigidbody* p_rigidbody, const PhysicsMaterial& physicsMaterial)
+	void PhysicsWorld::AddObject(Collider* p_collider, Rigidbody* p_rigidbody, const PhysicsMaterial& physicsMaterial)
 	{
-		objects.push_back({ colliders, p_rigidbody, physicsMaterial });
+		objects.push_back({ p_collider, p_rigidbody, physicsMaterial });
 	}
 
-	PhysicsObject* PhysicsWorld::RaycastObjects(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, HitResult& outHitResult)
+	PhysicsObject* PhysicsWorld::RaycastObjects(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, HitResult& outHitResult, Collider* p_ignore)
 	{
 		PhysicsObject* p_closestObj = nullptr;
 
 		for (PhysicsObject& object : objects)
 		{
-			for (Collider* p_collider : object.colliders)
+			if (object.p_collider == p_ignore)
+				continue;
+
+			HitResult hit;
+			if (object.p_collider->IntersectsRay(origin, direction, hit) && hit.distance < maxDistance)
 			{
-				HitResult hit;
-				if (p_collider->IntersectsRay(origin, direction, hit) && hit.distance < maxDistance)
-				{
-					maxDistance = hit.distance;
-					outHitResult = hit;
-					p_closestObj = &object;
-				}
+				maxDistance = hit.distance;
+				outHitResult = hit;
+				p_closestObj = &object;
 			}
 		}
 
 		return p_closestObj;
+	}
+
+	bool PhysicsWorld::RaycastWorld(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, HitResult& outHitResult)
+	{
+		float t = 0.f;
+
+		for (size_t i = 0; i < 100 && t < maxDistance; i++)
+		{
+			glm::vec3 p = origin + direction * t;
+			float r = worldSDF(p);
+
+			if (r < 0.001)
+			{
+				outHitResult.point = p;
+				outHitResult.normal = CalcNormal(worldSDF, p);
+				outHitResult.distance = t;
+				return true;
+			}
+
+			t += r;
+		}
+
+		return false;
 	}
 
 	void PhysicsWorld::Start()
@@ -261,11 +283,8 @@ namespace Engine
 			glm::mat4 rbWorldMatrix = glm::mat4_cast(object.p_rigidbody->rotation);
 			rbWorldMatrix[3] = glm::vec4(object.p_rigidbody->centerOfMass, 1.f);
 
-			for (Collider* p_collider : object.colliders)
-			{
-				p_collider->worldMatrix = rbWorldMatrix * p_collider->localMatrix;
-				p_collider->UpdateWorldAABB();
-			}
+			object.p_collider->worldMatrix = rbWorldMatrix * object.p_collider->localMatrix;
+			object.p_collider->UpdateWorldAABB();
 		}
 	}
 
@@ -281,8 +300,8 @@ namespace Engine
 		// object vs object
 		for (AabbIntersection& intersection : aabbIntersections)
 		{
-			Collider* p_firstCollider = intersection.p_firstObject->colliders[intersection.firstColliderIndex];
-			Collider* p_secondCollider = intersection.p_secondObject->colliders[intersection.secondColliderIndex];
+			Collider* p_firstCollider = intersection.p_firstObject->p_collider;
+			Collider* p_secondCollider = intersection.p_secondObject->p_collider;
 
 			HitResult hit;
 			if (p_firstCollider->IntersectsSDF(p_secondCollider->sdf, hit))
@@ -306,24 +325,21 @@ namespace Engine
 		// object vs world
 		for (PhysicsObject& object : objects)
 		{
-			for (Collider* p_collider : object.colliders)
+			HitResult hit;
+			if (object.p_collider->IntersectsSDF(worldSDF, hit))
 			{
-				HitResult hit;
-				if (p_collider->IntersectsSDF(worldSDF, hit))
-				{
-					glm::vec3 impulse = CalculateImpulseResponse(
-						hit.point,
-						hit.normal,
-						object.p_rigidbody,
-						nullptr,
-						object.physicsMaterial,
-						worldPhysicsMaterial
-					);
+				glm::vec3 impulse = CalculateImpulseResponse(
+					hit.point,
+					hit.normal,
+					object.p_rigidbody,
+					nullptr,
+					object.physicsMaterial,
+					worldPhysicsMaterial
+				);
 
-					glm::vec3 overlap = hit.normal * hit.distance;
+				glm::vec3 overlap = hit.normal * hit.distance;
 
-					collisions.push_back({ &object, hit.point, impulse, overlap });
-				}
+				collisions.push_back({ &object, hit.point, impulse, overlap });
 			}
 		}
 
@@ -340,11 +356,8 @@ namespace Engine
 			glm::mat4 rbWorldMatrix = glm::mat4_cast(object.p_rigidbody->rotation);
 			rbWorldMatrix[3] = glm::vec4(object.p_rigidbody->centerOfMass, 1.f);
 
-			for (Collider* p_collider : object.colliders)
-			{
-				p_collider->worldMatrix = rbWorldMatrix * p_collider->localMatrix;
-				p_collider->UpdateWorldAABB();
-			}
+			object.p_collider->worldMatrix = rbWorldMatrix * object.p_collider->localMatrix;
+			object.p_collider->UpdateWorldAABB();
 		}
 	}
 }

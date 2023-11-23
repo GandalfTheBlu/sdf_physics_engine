@@ -152,4 +152,9 @@ namespace Engine
 	{
 		return height;
 	}
+
+	void Window::SetMouseVisible(bool visible)
+	{
+		glfwSetInputMode(window, GLFW_CURSOR, visible ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+	}
 }

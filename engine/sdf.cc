@@ -8,6 +8,7 @@ namespace Engine
 		constexpr float h = 0.0001;
 		constexpr float x = 1.f;
 		constexpr float y = -1.f;
+
 		return glm::normalize(
 			glm::vec3(x, y, y) * sdf(p + glm::vec3(x, y, y) * h) +
 			glm::vec3(y, y, x) * sdf(p + glm::vec3(y, y, x) * h) +

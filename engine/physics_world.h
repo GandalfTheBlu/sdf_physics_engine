@@ -13,7 +13,7 @@ namespace Engine
 
 	struct PhysicsObject
 	{
-		std::vector<Collider*> colliders;
+		Collider* p_collider;
 		Rigidbody* p_rigidbody;
 		PhysicsMaterial physicsMaterial;
 	};
@@ -29,9 +29,7 @@ namespace Engine
 	struct AabbIntersection
 	{
 		PhysicsObject* p_firstObject;
-		size_t firstColliderIndex;
 		PhysicsObject* p_secondObject;
-		size_t secondColliderIndex;
 	};
 
 	struct EventPoint
@@ -45,7 +43,6 @@ namespace Engine
 		Type type;
 		size_t pairId;
 		PhysicsObject* p_object;
-		size_t colliderIndex;
 	};
 
 	class PhysicsWorld final
@@ -74,9 +71,10 @@ namespace Engine
 		PhysicsWorld();
 
 		void Init(float(*_worldSDF)(const glm::vec3&), const PhysicsMaterial& _worldPhysicsMaterial);
-		void AddObject(const std::vector<Collider*>& colliders, Rigidbody* p_rigidbody, const PhysicsMaterial& physicsMaterial);
+		void AddObject(Collider* p_collider, Rigidbody* p_rigidbody, const PhysicsMaterial& physicsMaterial);
 
-		PhysicsObject* RaycastObjects(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, HitResult& outHitResult);
+		PhysicsObject* RaycastObjects(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, HitResult& outHitResult, Collider* p_ignore = nullptr);
+		bool RaycastWorld(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, HitResult& outHitResult);
 
 		void Start();
 		void Update(float deltaTime);

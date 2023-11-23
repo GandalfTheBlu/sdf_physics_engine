@@ -14,7 +14,8 @@ namespace Engine
 		localInverseInertiaTensor(glm::identity<glm::mat3>()),
 		angularDamping(0.2f),
 		worldInverseInertiaTensor(glm::identity<glm::mat3>()),
-		accumulatedResponseTranslation(glm::vec3(0.f))
+		accumulatedResponseTranslation(glm::vec3(0.f)),
+		constraints(0)
 	{}
 
 	void Rigidbody::AddForce(const glm::vec3& force)
@@ -62,45 +63,66 @@ namespace Engine
 
 	void Rigidbody::Integrate(float fixedDeltaTime)
 	{
-		// update linear velocity based on force and mass (linear acceleration)
-		// remove component in response translation direction
-		linearVelocity += accumulatedForce * (fixedDeltaTime * inverseMass);
-
-		if (accumulatedResponseTranslation != glm::vec3(0.f))
+		if (!(constraints & 1))
 		{
-			glm::vec3 translationNormal = glm::normalize(accumulatedResponseTranslation);
-			float velocityNormalComponent = glm::dot(translationNormal, linearVelocity);
+			// update linear velocity based on force and mass (linear acceleration)
+			// remove component in response translation direction
+			linearVelocity += accumulatedForce * (fixedDeltaTime * inverseMass);
 
-			// if velocity and translation are opposite in direction
-			if (velocityNormalComponent < 0.f)
-				linearVelocity -= translationNormal * velocityNormalComponent;
+			if (accumulatedResponseTranslation != glm::vec3(0.f))
+			{
+				glm::vec3 translationNormal = glm::normalize(accumulatedResponseTranslation);
+				float velocityNormalComponent = glm::dot(translationNormal, linearVelocity);
+
+				// if velocity and translation are opposite in direction
+				if (velocityNormalComponent < 0.f)
+					linearVelocity -= translationNormal * velocityNormalComponent;
+			}
+
+			// apply linear damping
+			linearVelocity *= glm::pow(1.f - glm::clamp(linearDamping, 0.f, 0.999f), fixedDeltaTime);
+
+			// update center of mass based on linear velocity and response translation
+			centerOfMass += linearVelocity * fixedDeltaTime + accumulatedResponseTranslation;
 		}
+		else
+			linearVelocity = glm::vec3(0.f);
 
-		// apply linear damping
-		linearVelocity *= glm::pow(1.f - glm::clamp(linearDamping, 0.f, 0.999f), fixedDeltaTime);
+		if (!(constraints & 2))
+		{
+			// convert inertia tensor to world space
+			glm::mat3 rotationMatrix(glm::mat3_cast(rotation));
+			worldInverseInertiaTensor = rotationMatrix * localInverseInertiaTensor * glm::transpose(rotationMatrix);
 
-		// update center of mass based on linear velocity and response translation
-		centerOfMass += linearVelocity * fixedDeltaTime + accumulatedResponseTranslation;
+			// update angular velocity based on angular acceleration
+			angularVelocity += (worldInverseInertiaTensor * accumulatedTorque) * fixedDeltaTime;
 
+			// apply angular damping
+			angularVelocity *= glm::pow(1.f - glm::clamp(angularDamping, 0.f, 0.999f), fixedDeltaTime);
 
-		// convert inertia tensor to world space
-		glm::mat3 rotationMatrix(glm::mat3_cast(rotation));
-		worldInverseInertiaTensor = rotationMatrix * localInverseInertiaTensor * glm::transpose(rotationMatrix);
-
-		// update angular velocity based on angular acceleration
-		angularVelocity += (worldInverseInertiaTensor * accumulatedTorque) * fixedDeltaTime;
-
-		// apply angular damping
-		angularVelocity *= glm::pow(1.f - glm::clamp(angularDamping, 0.f, 0.999f), fixedDeltaTime);
-
-		// update rotation based on angular velocity and response rotation
-		rotation += (0.5f * fixedDeltaTime) * glm::quat(0.f, angularVelocity.x, angularVelocity.y, angularVelocity.z) * rotation;
-		rotation = glm::normalize(rotation);
+			// update rotation based on angular velocity and response rotation
+			rotation += (0.5f * fixedDeltaTime) * glm::quat(0.f, angularVelocity.x, angularVelocity.y, angularVelocity.z) * rotation;
+			rotation = glm::normalize(rotation);
+		}
+		else
+			angularVelocity = glm::vec3(0.f);
 
 		// reset accumulators
 		accumulatedForce = glm::vec3(0.f);
 		accumulatedTorque = glm::vec3(0.f);
 		accumulatedResponseTranslation = glm::vec3(0.f);
+	}
+
+	void Rigidbody::SetLockPosition(bool flag)
+	{
+		constraints &= ~1;
+		constraints |= (flag ? 1 : 0);
+	}
+
+	void Rigidbody::SetLockRotation(bool flag)
+	{
+		constraints &= ~2;
+		constraints |= (flag ? 2 : 0);
 	}
 
 	glm::mat3 Rigidbody::SphereInertiaTensor(float radius, float mass)

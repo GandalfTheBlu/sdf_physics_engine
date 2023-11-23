@@ -29,5 +29,7 @@ namespace Engine
 
 		int Width() const;
 		int Height() const;
+
+		void SetMouseVisible(bool visible);
 	};
 }

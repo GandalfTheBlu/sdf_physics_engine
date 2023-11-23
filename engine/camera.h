@@ -15,5 +15,8 @@ namespace Engine
 
 		glm::mat4 CalcV(const glm::mat4& worldMatrix) const;
 		glm::mat4 CalcP() const;
+
+		float GetNearPlane() const;
+		float GetFarPlane() const;
 	};
 }
