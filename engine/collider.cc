@@ -119,7 +119,7 @@ namespace Engine
 			if (t >= 1.f)
 				break;
 
-			t += step;
+			t += glm::max(step, dist);
 		}
 
 		if (!hit)

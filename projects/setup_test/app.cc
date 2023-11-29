@@ -19,18 +19,32 @@ glm::vec3 RepXZ(const glm::vec3& p, const glm::vec2& s)
 	return p - glm::vec3(q.x, 0.f, q.y);
 }
 
+float Hut(const glm::vec3& p)
+{
+	float boxes = Box(glm::abs(p) - glm::vec3(3.5f, 0.f, 3.5f), glm::vec3(0.5f, 6.f, 0.5f));
+	float sphere = glm::max(glm::max(glm::length(p - glm::vec3(0.f, 6.f, 0.f)) - 5.7f, -(p.y - 6.f)), p.y - 8.f);
+	sphere = glm::max(sphere, -(glm::length(p - glm::vec3(0.f, 6.f, 0.f)) - 5.f));
+	return glm::min(sphere, boxes);
+}
+
+float WorldSDF(const glm::vec3& p)
+{
+	float plane = p.y;
+	float huts = Hut(RepXZ(p, glm::vec2(20.)));
+	plane = glm::min(plane, huts);
+	return plane;
+	//return glm::min(p.y, Box(RepXZ(p, glm::vec2(6.f)), glm::vec3(1.f)) - 0.1f);
+}
+
 void App_SetupTest::Init()
 {
-	window.Init(1200, 800, "setup_test");
+	//window.Init(1200, 800, "setup_test");
+	window.Init(800, 600, "setup_test");
 	window.SetMouseVisible(false);
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
 
-	auto worldSDF = [](const glm::vec3& p)
-	{
-		return glm::min(p.y, Box(RepXZ(p, glm::vec2(6.f)), glm::vec3(1.f)) - 0.1f);
-	};
-
-	physicsWorld.Init(worldSDF, { 0.2f, 0.4f });
+	physicsWorld.Init(WorldSDF, { 0.2f, 0.4f });
+	
 	physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 	for (size_t i = 0; i < spheres.size(); i++)
@@ -39,7 +53,7 @@ void App_SetupTest::Init()
 		float radius = 1.f;
 
 		Engine::Rigidbody& rb = spheres[i].rb;
-		rb.centerOfMass = glm::vec3((float)i * 3.f, 6.f, 6.f);
+		rb.centerOfMass = glm::vec3(0.f, 3.f + 3.f * i, 7.f + 0.3f * glm::cos(float(i)));
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::SphereInertiaTensor(radius, mass));
 
@@ -107,13 +121,18 @@ void App_SetupTest::UpdateLoop()
 
 	float fixedDeltaTime = 1.f / 60.f;
 
+	bool mouseVisible = false;
+
 	while (!window.ShouldClose())
 	{
 		window.BeginUpdate();
 
 		auto& IP = Engine::Input::Instance();
 		if (IP.GetKey(GLFW_KEY_ESCAPE).WasPressed())
-			break;
+			window.SetMouseVisible(mouseVisible = !mouseVisible);
+
+		if(IP.GetKey(GLFW_KEY_R).WasPressed())
+			sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
 
 		physicsWorld.Update(fixedDeltaTime);
 		
@@ -138,7 +157,7 @@ void App_SetupTest::UpdateLoop()
 		skyboxTexture.Unbind(GL_TEXTURE0);
 		skyboxShader.StopUsing();
 
-		glm::vec4 spheresData[10];
+		glm::vec4 spheresData[20];
 		for(size_t i=0; i<spheres.size(); i++)
 			spheresData[i] = glm::vec4(spheres[i].rb.centerOfMass, spheres[i].collider.radius);
 
@@ -159,7 +178,7 @@ void App_SetupTest::UpdateLoop()
 		sdfShader.SetMat4("u_invVP", &invVP[0][0]);
 		sdfShader.SetVec3("u_camPos", &player.cameraTransform[3][0]);
 		sdfShader.SetFloat("u_pixelRadius", pixelRadius);
-		sdfShader.SetVec4("u_spheres", &spheresData[0][0], 10);
+		sdfShader.SetVec4("u_spheres", &spheresData[0][0], 20);
 		sdfShader.SetInt("u_sphereCount", spheres.size());
 		sdfShader.SetVec4("u_capsules", &capsulesData[0][0], 10 * 2);
 		sdfShader.SetInt("u_capsuleCount", capsules.size());

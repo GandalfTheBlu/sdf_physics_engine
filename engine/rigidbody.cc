@@ -73,7 +73,7 @@ namespace Engine
 			{
 				glm::vec3 translationNormal = glm::normalize(accumulatedResponseTranslation);
 				float velocityNormalComponent = glm::dot(translationNormal, linearVelocity);
-
+			
 				// if velocity and translation are opposite in direction
 				if (velocityNormalComponent < 0.f)
 					linearVelocity -= translationNormal * velocityNormalComponent;

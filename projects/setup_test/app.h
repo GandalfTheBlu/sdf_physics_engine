@@ -20,7 +20,7 @@ public:
 	Engine::Window window;
 	Engine::PhysicsWorld physicsWorld;
 	Player player;
-	std::array<Sphere, 10> spheres;
+	std::array<Sphere, 20> spheres;
 	std::array<Capsule, 10> capsules;
 
 	App_SetupTest();

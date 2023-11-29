@@ -71,8 +71,16 @@ void Player::Update(float deltaTime)
 	if (IP.GetKey(GLFW_KEY_SPACE).WasPressed() && IsOnGround())
 		rigidbody.linearVelocity.y = glm::sqrt(2.f * 9.82f * jumpHeight);
 
-	cameraYaw += (float)mouse.movement.dx * sensitivity;
-	cameraPitch += (float)mouse.movement.dy * sensitivity;
+	static bool mouseIsVisible = false;
+
+	if (IP.GetKey(GLFW_KEY_ESCAPE).WasPressed())
+		mouseIsVisible = !mouseIsVisible;
+
+	if (!mouseIsVisible)
+	{
+		cameraYaw += (float)mouse.movement.dx * sensitivity;
+		cameraPitch += (float)mouse.movement.dy * sensitivity;
+	}
 
 	cameraPitch = glm::clamp(cameraPitch, -1.5f, 1.5f);
 

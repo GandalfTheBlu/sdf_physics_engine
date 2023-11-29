@@ -1,6 +1,6 @@
 #version 430
 
-#define MAX_SPHERES 10
+#define MAX_SPHERES 20
 #define MAX_CAPSULES 10
 #define MAX_DISTANCE 100.
 
@@ -53,6 +53,14 @@ vec3 RepXZ(vec3 p, vec2 s)
 	return p - vec3(q.x, 0., q.y);
 }
 
+float Hut(vec3 p)
+{
+	float boxes = Box(abs(p)-vec3(3.5,0.,3.5), vec3(0.5, 6., 0.5));
+	float sphere = max(max(length(p - vec3(0., 6., 0.)) - 5.7, -(p.y - 6.)), p.y-8.);
+	sphere = max(sphere, -(length(p - vec3(0., 6., 0.)) - 5.));
+	return min(sphere, boxes);
+}
+
 float Sdf(vec3 p)
 {
 	float d = 100000.;
@@ -67,7 +75,11 @@ float Sdf(vec3 p)
 		d = min(d, Capsule(p, aAndR.xyz, b, aAndR.w));
 	}
 	
-	float plane = min(p.y, Box(RepXZ(p, vec2(6.)), vec3(1.))) - 0.2;
+	//float plane = min(p.y, Box(RepXZ(p, vec2(6.)), vec3(1.))) - 0.2;
+	float plane = p.y;
+	float huts = Hut(RepXZ(p, vec2(20.)));
+	plane = min(plane, huts);
+	
 	return SmoothUnion(d, plane, 0.6);
 }
 
@@ -88,10 +100,10 @@ float SoftShadow(vec3 origin, vec3 ray, float minT, float maxT, float k)
     for(int i=0; i<100 && t<maxT; i++)
     {
         float h = Sdf(origin + ray * t);
-        if(h<0.001)
+        if(h<0.01)
             return 0.0;
 		
-        res = min(res, k*h/t);
+		//res = min(res, k*h/t);
         t += h;
     }
 	
@@ -167,12 +179,12 @@ void main()
 	vec3 normal = CalcNormal(point);
 	vec3 reflected = reflect(ray, normal);
 	vec3 lightDir = normalize(vec3(-0.5, -1., 0.8));
-	vec3 amb = vec3(0.2, 0.2, 0.3);
+	vec3 amb = vec3(0.4, 0.4, 0.5);
 	float shadow = SoftShadow(point + normal * 0.01, -lightDir, 0.3, 100., 8.);
 	float diff = max(0., dot(normal, -lightDir));
 	float spec = pow(max(0., dot(reflected, -lightDir)), 16.);
 	vec3 tint = mix(vec3(0.7, 0.6, 0.5), vec3(0.5, 0.6, 0.7), min(point.y, 1.));
-	vec3 col = amb + tint * vec3(shadow * (diff + spec));
+	vec3 col = tint * (amb + vec3(shadow * (diff + spec)));
 	
 	o_color = vec4(col, 1.);
 }

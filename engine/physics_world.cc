@@ -136,16 +136,12 @@ namespace Engine
 			relativePoint[1] = hitPoint - p_optionalSecondRb->centerOfMass;
 			angularVel[1] = p_optionalSecondRb->angularVelocity;
 			pointVel[1] = p_optionalSecondRb->linearVelocity + glm::cross(angularVel[1], relativePoint[1]);
-			relativeVel = pointVel[1] - pointVel[0];
+			relativeVel = pointVel[0] - pointVel[1];
 		}
 
 		// transform relative velocity to contact space
 		glm::vec3 contactVel = worldToContact * relativeVel;
 		float desiredNormalVelocity = -contactVel.x * (1.f + restitution);
-
-		if (desiredNormalVelocity < 0.f)
-			return glm::vec3(0.f);
-
 		float totalInverseMass = p_firstRb->inverseMass;
 
 		// build matrix that converts a unit of impulse to a unit of torque
@@ -317,8 +313,8 @@ namespace Engine
 
 				glm::vec3 overlap = hit.normal * (hit.distance * 0.5f);
 
-				collisions.push_back({ intersection.p_firstObject, hit.point, -impulse, overlap });
-				collisions.push_back({ intersection.p_secondObject, hit.point, impulse, -overlap });
+				collisions.push_back({ intersection.p_firstObject, hit.point, impulse, overlap });
+				collisions.push_back({ intersection.p_secondObject, hit.point, -impulse, -overlap });
 			}
 		}
 
