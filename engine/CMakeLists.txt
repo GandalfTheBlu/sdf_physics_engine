@@ -8,6 +8,9 @@ SET(engine_files
 	input.cc
 	window.h
 	window.cc
+	stb_image.h
+	texture.h
+	texture.cc
 	render_mesh.h
 	render_mesh.cc
 	default_meshes.h

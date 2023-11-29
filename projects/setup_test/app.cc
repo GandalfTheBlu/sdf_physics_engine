@@ -1,6 +1,7 @@
 #include "app.h"
 #include "default_meshes.h"
 #include "shader.h"
+#include "texture.h"
 #include "input.h"
 
 App_SetupTest::App_SetupTest()
@@ -87,6 +88,21 @@ void App_SetupTest::UpdateLoop()
 	Engine::Shader flatShader;
 	flatShader.Reload("assets/shaders/flat_vert.glsl", "assets/shaders/flat_frag.glsl");
 
+	Engine::TextureCube skyboxTexture;
+	std::string skyboxTexturePaths[6]
+	{
+		"assets/textures/skybox/right.jpg",
+		"assets/textures/skybox/left.jpg",
+		"assets/textures/skybox/top.jpg",
+		"assets/textures/skybox/bottom.jpg",
+		"assets/textures/skybox/front.jpg",
+		"assets/textures/skybox/back.jpg"
+	};
+	skyboxTexture.Reload(skyboxTexturePaths);
+
+	Engine::Shader skyboxShader;
+	skyboxShader.Reload("assets/shaders/skybox_vert.glsl", "assets/shaders/skybox_frag.glsl");
+
 	float pixelRadius = 0.5f * glm::length(glm::vec2(1.f / window.Width(), 1.f / window.Height()));
 
 	float fixedDeltaTime = 1.f / 60.f;
@@ -103,8 +119,24 @@ void App_SetupTest::UpdateLoop()
 		
 		player.Update(fixedDeltaTime);
 
-		glm::mat4 VP = player.camera.CalcP() * player.camera.CalcV(player.cameraTransform);
+		glm::mat4 P = player.camera.CalcP();
+		glm::mat4 V = player.camera.CalcV(player.cameraTransform);
+		glm::mat4 VP = P * V;
 		glm::mat4 invVP = glm::inverse(VP);
+		glm::mat4 skyboxVP = P * glm::mat4(glm::mat3(V));
+
+		skyboxShader.Use();
+		skyboxShader.SetMat4("u_VP", &skyboxVP[0][0]);
+		skyboxTexture.Bind(GL_TEXTURE0);
+		cube.Bind();
+		glDepthMask(GL_FALSE);
+		glCullFace(GL_FRONT);
+		cube.Draw(0);
+		glDepthMask(GL_TRUE);
+		glCullFace(GL_BACK);
+		cube.Unbind();
+		skyboxTexture.Unbind(GL_TEXTURE0);
+		skyboxShader.StopUsing();
 
 		glm::vec4 spheresData[10];
 		for(size_t i=0; i<spheres.size(); i++)

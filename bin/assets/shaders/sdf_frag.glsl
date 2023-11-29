@@ -67,7 +67,7 @@ float Sdf(vec3 p)
 		d = min(d, Capsule(p, aAndR.xyz, b, aAndR.w));
 	}
 	
-	float plane = min(p.y, Box(RepXZ(p, vec2(6.)), vec3(1.))) - 0.01 * sin(p.x * 40.) * sin(p.z * 40.) - 0.1;
+	float plane = min(p.y, Box(RepXZ(p, vec2(6.)), vec3(1.))) - 0.2;
 	return SmoothUnion(d, plane, 0.6);
 }
 
@@ -151,7 +151,6 @@ float RayMarch(vec3 origin, vec3 ray)
 
 void main()
 {
-	vec3 lightDir = normalize(vec3(-0.5, -1., 0.8));
 	vec3 origin = u_camPos;
 	vec3 ray = ScreenRay();
 	float t = RayMarch(origin, ray);
@@ -159,20 +158,21 @@ void main()
 	if(t >= MAX_DISTANCE)
 		discard;
 	
-	vec3 point = origin + ray * t;
-	vec3 normal = CalcNormal(point);
-	float diff = max(0., dot(normal, -lightDir));
-	float spec = pow(max(0., dot(reflect(ray, normal), -lightDir)), 32.);
-	float shadow = SoftShadow(point + normal * 0.01, -lightDir, 0.3, 100., 8.);
-	vec3 f = fract(point);
-	vec3 amb = mix(vec3(0.3, 0.2, 0.2), vec3(0.2, 0.2, 0.3), 1. + 0.5 * normal.y);
-	vec3 tint = mix(vec3(0.7, 0.4, 0.3), vec3(1.), pow(clamp(point.y, 0., 1.), 2.));
-	vec3 col = clamp(amb + tint * vec3((diff + spec) * shadow), 0., 1.);
-	
 	float zNear = u_nearFar.x;
 	float zFar = u_nearFar.y;
 	float lin = t;
 	gl_FragDepth = (1. + (2. * zNear * zFar / lin - zFar - zNear) / (zNear - zFar)) / 2.;
+	
+	vec3 point = origin + ray * t;
+	vec3 normal = CalcNormal(point);
+	vec3 reflected = reflect(ray, normal);
+	vec3 lightDir = normalize(vec3(-0.5, -1., 0.8));
+	vec3 amb = vec3(0.2, 0.2, 0.3);
+	float shadow = SoftShadow(point + normal * 0.01, -lightDir, 0.3, 100., 8.);
+	float diff = max(0., dot(normal, -lightDir));
+	float spec = pow(max(0., dot(reflected, -lightDir)), 16.);
+	vec3 tint = mix(vec3(0.7, 0.6, 0.5), vec3(0.5, 0.6, 0.7), min(point.y, 1.));
+	vec3 col = amb + tint * vec3(shadow * (diff + spec));
 	
 	o_color = vec4(col, 1.);
 }
