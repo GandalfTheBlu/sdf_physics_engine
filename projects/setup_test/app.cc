@@ -19,33 +19,70 @@ glm::vec3 RepXZ(const glm::vec3& p, const glm::vec2& s)
 	return p - glm::vec3(q.x, 0.f, q.y);
 }
 
-float Hut(const glm::vec3& p)
+glm::vec3 RotX(const glm::vec3& p, float k)
 {
-	float boxes = Box(glm::abs(p) - glm::vec3(3.5f, 0.f, 3.5f), glm::vec3(0.5f, 6.f, 0.5f));
-	float sphere = glm::max(glm::max(glm::length(p - glm::vec3(0.f, 6.f, 0.f)) - 5.7f, -(p.y - 6.f)), p.y - 8.f);
-	sphere = glm::max(sphere, -(glm::length(p - glm::vec3(0.f, 6.f, 0.f)) - 5.f));
-	return glm::min(sphere, boxes);
+	float k0 = glm::atan(p.y, p.z);
+	float r = glm::length(glm::vec2(p.y, p.z));
+	return glm::vec3(p.x, r * glm::sin(k0 + k), r * glm::cos(k0 + k));
+}
+
+glm::vec3 Fold(const glm::vec3& p, const glm::vec3& n)
+{
+	return p - 2.f * glm::min(0.f, glm::dot(p, n)) * n;
+}
+
+float Capsule(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, float r)
+{
+	glm::vec3 pa = p - a;
+	glm::vec3 ba = b - a;
+	float h = glm::clamp(glm::dot(pa, ba) / glm::dot(ba, ba), 0.f, 1.f);
+	return glm::length(pa - ba * h) - r;
+}
+
+float Tree(glm::vec3 p)
+{
+	glm::vec2 dim = glm::vec2(1.f, 8.f);
+	float d = Capsule(p, glm::vec3(0.f, -1.f, 0.f), glm::vec3(0.f, 1.f + dim.y, 0.f), dim.x);
+	glm::vec3 scale = glm::vec3(1.f);
+	glm::vec3 change = glm::vec3(0.6f, 0.75f, 0.6f);
+
+	glm::vec3 n1 = normalize(glm::vec3(1., 0., 1.));
+	glm::vec3 n2 = glm::vec3(n1.x, 0.f, -n1.z);
+	glm::vec3 n3 = glm::vec3(-n1.x, 0.f, n1.z);
+
+	for (int i = 0; i < 7; i++)
+	{
+		p = Fold(p, n1);
+		p = Fold(p, n2);
+		p = Fold(p, n3);
+
+		p.y -= scale.y * dim.y;
+		p.z = abs(p.z);
+		p = RotX(p, 3.1415f * 0.25f);
+		scale *= change;
+
+		d = glm::min(d, Capsule(p, glm::vec3(0.f), glm::vec3(0.f, dim.y * scale.y, 0.), scale.x * dim.x));
+	}
+
+	return d;
 }
 
 float WorldSDF(const glm::vec3& p)
 {
 	float plane = p.y;
-	float huts = Hut(RepXZ(p, glm::vec2(20.)));
+	float huts = Tree(RepXZ(p - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
 	plane = glm::min(plane, huts);
 	return plane;
-	//return glm::min(p.y, Box(RepXZ(p, glm::vec2(6.f)), glm::vec3(1.f)) - 0.1f);
 }
 
 void App_SetupTest::Init()
 {
-	//window.Init(1200, 800, "setup_test");
-	window.Init(800, 600, "setup_test");
+	window.Init(1200, 800, "setup_test");
+	//window.Init(800, 600, "setup_test");
 	window.SetMouseVisible(false);
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
 
 	physicsWorld.Init(WorldSDF, { 0.2f, 0.4f });
-	
-	physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 	for (size_t i = 0; i < spheres.size(); i++)
 	{
@@ -53,7 +90,7 @@ void App_SetupTest::Init()
 		float radius = 1.f;
 
 		Engine::Rigidbody& rb = spheres[i].rb;
-		rb.centerOfMass = glm::vec3(0.f, 3.f + 3.f * i, 7.f + 0.3f * glm::cos(float(i)));
+		rb.centerOfMass = glm::vec3(0.f + i * 3.f, 40.f, 30.f);
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::SphereInertiaTensor(radius, mass));
 
@@ -69,7 +106,7 @@ void App_SetupTest::Init()
 		float height = 2.f;
 
 		Engine::Rigidbody& rb = capsules[i].rb;
-		rb.centerOfMass = glm::vec3((float)i * 3.f, 6.f, 12.f);
+		rb.centerOfMass = glm::vec3(0.f + i * 3.f, 40.f, 10.f);
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::CylinderInertiaTensor(radius, height + radius, mass));
 		rb.angularDamping = 0.9f;
@@ -83,7 +120,7 @@ void App_SetupTest::Init()
 	player.AddToPhysicsWorld(physicsWorld);
 	player.rigidbody.SetMass(100.f);
 	player.rigidbody.SetInertiaTensor(Engine::Rigidbody::CylinderInertiaTensor(1.f, 2.f, 100.f));
-	player.rigidbody.centerOfMass = glm::vec3(0.f, 4.f, 0.f);
+	player.rigidbody.centerOfMass = glm::vec3(4.f, 4.f, 0.f);
 	player.rigidbody.SetLockRotation(true);
 	player.camera.Init(70.f, (float)window.Width() / window.Height(), 0.3f, 500.f);
 
@@ -133,6 +170,9 @@ void App_SetupTest::UpdateLoop()
 
 		if(IP.GetKey(GLFW_KEY_R).WasPressed())
 			sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
+
+		if(IP.GetKey(GLFW_KEY_ENTER).WasPressed())
+			physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 		physicsWorld.Update(fixedDeltaTime);
 		

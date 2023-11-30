@@ -53,12 +53,45 @@ vec3 RepXZ(vec3 p, vec2 s)
 	return p - vec3(q.x, 0., q.y);
 }
 
-float Hut(vec3 p)
+vec3 RotX(vec3 p, float k)
 {
-	float boxes = Box(abs(p)-vec3(3.5,0.,3.5), vec3(0.5, 6., 0.5));
-	float sphere = max(max(length(p - vec3(0., 6., 0.)) - 5.7, -(p.y - 6.)), p.y-8.);
-	sphere = max(sphere, -(length(p - vec3(0., 6., 0.)) - 5.));
-	return min(sphere, boxes);
+	float k0 = atan(p.y, p.z);
+	float r = length(p.yz);
+	return vec3(p.x, r*sin(k0+k), r*cos(k0+k));
+}
+
+vec3 Fold(vec3 p, vec3 n)
+{
+	return p - 2.*min(0., dot(p, n)) * n;
+}
+
+float Tree(vec3 p)
+{	
+	vec2 dim = vec2(1., 8.);
+	float d = Capsule(p, vec3(0., -1., 0.), vec3(0., 1. + dim.y, 0.), dim.x);
+	vec3 scale = vec3(1.);
+	vec3 change = vec3(0.6,0.75,0.6);
+	
+	vec3 n1 = normalize(vec3(1., 0., 1.)); 
+	vec3 n2 = vec3(n1.x, 0., -n1.z);
+	vec3 n3 = vec3(-n1.x, 0., n1.z);
+	
+	for(int i=0; i<7; i++)
+	{
+		p = Fold(p, n1);	
+		p = Fold(p, n2);	
+		p = Fold(p, n3);	
+		
+		p.y -= scale.y*dim.y;
+		p.z = abs(p.z);
+		p = RotX(p, 3.1415*0.25);
+		
+		scale *= change;
+		
+		d = min(d, Capsule(p, vec3(0.), vec3(0., dim.y * scale.y, 0.), scale.x*dim.x));
+	}
+	
+	return d;
 }
 
 float Sdf(vec3 p)
@@ -75,10 +108,9 @@ float Sdf(vec3 p)
 		d = min(d, Capsule(p, aAndR.xyz, b, aAndR.w));
 	}
 	
-	//float plane = min(p.y, Box(RepXZ(p, vec2(6.)), vec3(1.))) - 0.2;
 	float plane = p.y;
-	float huts = Hut(RepXZ(p, vec2(20.)));
-	plane = min(plane, huts);
+	float trees = Tree(RepXZ(p-vec3(0.,1.,0.), vec2(40.)));
+	plane = min(plane, trees);
 	
 	return SmoothUnion(d, plane, 0.6);
 }
@@ -178,7 +210,7 @@ void main()
 	vec3 point = origin + ray * t;
 	vec3 normal = CalcNormal(point);
 	vec3 reflected = reflect(ray, normal);
-	vec3 lightDir = normalize(vec3(-0.5, -1., 0.8));
+	vec3 lightDir = normalize(vec3(0.5, -1., 0.8));
 	vec3 amb = vec3(0.4, 0.4, 0.5);
 	float shadow = SoftShadow(point + normal * 0.01, -lightDir, 0.3, 100., 8.);
 	float diff = max(0., dot(normal, -lightDir));
