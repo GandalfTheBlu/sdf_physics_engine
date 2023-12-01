@@ -53,7 +53,6 @@ namespace Engine
 		PhysicsMaterial worldPhysicsMaterial;
 
 		std::vector<AabbIntersection> aabbIntersections;
-		std::vector<Collision> collisions;
 
 		void PhysicsWorld::FindAabbIntersections();
 
@@ -66,6 +65,7 @@ namespace Engine
 			const PhysicsMaterial& secondPhysicsMat);
 
 	public:
+		std::vector<Collision> collisions;
 		glm::vec3 gravity;
 
 		PhysicsWorld();

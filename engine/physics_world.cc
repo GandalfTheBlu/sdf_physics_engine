@@ -141,7 +141,7 @@ namespace Engine
 
 		// transform relative velocity to contact space
 		glm::vec3 contactVel = worldToContact * relativeVel;
-		float desiredNormalVelocity = glm::abs(contactVel.x * (1.f + restitution));
+		float desiredNormalVelocity = -contactVel.x * (1.f + restitution);
 
 		float totalInverseMass = p_firstRb->inverseMass;
 
@@ -199,7 +199,7 @@ namespace Engine
 
 		// check if the planar component of the impulse exceeds the static friction limit
 		// if it does, we change the impulse to simulate dynamic friction
-		if (planarImpulse > contactImpulse.x * friction)
+		if (planarImpulse > glm::abs(contactImpulse.x) * friction)
 		{
 			contactImpulse.y /= planarImpulse;
 			contactImpulse.z /= planarImpulse;
@@ -259,7 +259,7 @@ namespace Engine
 			glm::vec3 p = origin + direction * t;
 			float r = worldSDF(p);
 
-			if (r < 0.001)
+			if (r < 0.01f)
 			{
 				outHitResult.point = p;
 				outHitResult.normal = CalcNormal(worldSDF, p);

@@ -77,9 +77,11 @@ float SmoothUnion(float d1, float d2, float k)
 
 float WorldSDF(const glm::vec3& p)
 {
-	float plane = p.y - 0.2f * glm::sin(p.x) * glm::sin(p.z);
-	float trees = Tree(RepXZ(p - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
-	float hills = glm::length(RepXZ(p + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
+	glm::vec3 q = p;
+	q.y -= 20. * cos(q.x * 0.01 + 1.5) * cos(q.z * 0.01 + 1.5);
+	float plane = q.y - 0.2f * glm::sin(q.x) * glm::sin(q.z);
+	float trees = Tree(RepXZ(q - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
+	float hills = glm::length(RepXZ(q + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
 	return SmoothUnion(plane, glm::min(trees, hills), 0.8f);
 	return plane;
 }
@@ -100,7 +102,7 @@ void App_SetupTest::Init()
 		float radius = 1.f;
 
 		Engine::Rigidbody& rb = spheres[i].rb;
-		rb.centerOfMass = glm::vec3(0.f + i * 3.f, 40.f, 30.f);
+		rb.centerOfMass = glm::vec3(0.f, 20.f + i * 3.f, 30.f);
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::SphereInertiaTensor(radius, mass));
 
@@ -116,7 +118,7 @@ void App_SetupTest::Init()
 		float height = 2.f;
 
 		Engine::Rigidbody& rb = capsules[i].rb;
-		rb.centerOfMass = glm::vec3(0.f + i * 3.f, 40.f, 10.f);
+		rb.centerOfMass = glm::vec3(0.f, 20.f + i * 4.f, 10.f);
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::CylinderInertiaTensor(radius, height + radius, mass));
 		rb.angularDamping = 0.9f;
@@ -145,10 +147,11 @@ void App_SetupTest::UpdateLoop()
 	Engine::GenerateUnitSphere(sphereMesh, {Engine::MeshGeneratorSettings::E_Normals | Engine::MeshGeneratorSettings::E_Uvs});
 	Engine::GenerateUnitCapsule(capsuleMesh, { Engine::MeshGeneratorSettings::E_Normals | Engine::MeshGeneratorSettings::E_Uvs});
 
-	Engine::Shader sdfShader, phongShader, skyboxShader;
+	Engine::Shader sdfShader, phongShader, skyboxShader, flatShader;
 	sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
 	phongShader.Reload("assets/shaders/phong_textured_vert.glsl", "assets/shaders/phong_textured_frag.glsl");
 	skyboxShader.Reload("assets/shaders/skybox_vert.glsl", "assets/shaders/skybox_frag.glsl");
+	flatShader.Reload("assets/shaders/flat_vert.glsl", "assets/shaders/flat_frag.glsl");
 
 	Engine::TextureCube skyboxTexture;
 	std::string skyboxTexturePaths[6]
@@ -170,6 +173,8 @@ void App_SetupTest::UpdateLoop()
 	float pixelRadius = 0.5f * glm::length(glm::vec2(1.f / window.Width(), 1.f / window.Height()));
 	float fixedDeltaTime = 1.f / 60.f;
 	bool mouseVisible = false;
+	std::vector<glm::vec4> particles;
+	float particleLifeTime = 1.f;
 
 	while (!window.ShouldClose())
 	{
@@ -184,6 +189,27 @@ void App_SetupTest::UpdateLoop()
 			sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
 
 		physicsWorld.Update(fixedDeltaTime);
+
+		for (Engine::Collision& collision : physicsWorld.collisions)
+		{
+			if (glm::length2(collision.impulse) * collision.p_object->p_rigidbody->inverseMass > 300.f)
+			{
+				particles.push_back(glm::vec4(collision.hitPoint + glm::vec3(0.1f, 0.f, 0.f), 0.1f));
+				particles.push_back(glm::vec4(collision.hitPoint - glm::vec3(0.f, 0.1f, 0.f), 0.f));
+				particles.push_back(glm::vec4(collision.hitPoint + glm::vec3(0.f, 0.f, 0.1f), 0.13f));
+			}
+		}
+
+		for (int i=(int)particles.size()-1; i>=0; i--)
+		{
+			if (particles[i].w > particleLifeTime)
+			{
+				particles[i] = particles.back();
+				particles.pop_back();
+			}
+			else
+				particles[i] += glm::vec4(0.f, 10.f - 20.f * particles[i].w, 0.f, 1.f) * fixedDeltaTime;
+		}
 		
 		player.Update(fixedDeltaTime);
 
@@ -268,6 +294,48 @@ void App_SetupTest::UpdateLoop()
 		}
 		objectTexture.Unbind(GL_TEXTURE0);
 		phongShader.StopUsing();
+
+		flatShader.Use();
+		{
+			glm::mat4 M(1.f);
+			M[0][0] = 4.f / window.Width();
+			M[1][1] = 4.f / window.Height();
+			glm::vec3 color(0.9f, 0.7f, 0.f);
+
+			flatShader.SetMat4("u_MVP", &M[0][0]);
+			flatShader.SetVec3("u_color", &color[0]);
+			screenQuad.Bind();
+			screenQuad.Draw(0);
+			screenQuad.Unbind();
+		}
+		flatShader.StopUsing();
+
+		
+		flatShader.Use();
+		for (glm::vec4& particle : particles)
+		{
+			float alpha = particle.w / particleLifeTime;
+			glm::mat4 M(0.3f * (1.f - alpha));
+			M[3] = glm::vec4(glm::vec3(particle), 1.f);
+
+			M = M * glm::mat4_cast(glm::angleAxis(3.14f * alpha, glm::vec3(0.f, 0.f, 1.f)));
+
+			glm::mat3 scale = player.cameraTransform * M;
+			M[0] = glm::vec4(scale[0], 0.f);
+			M[1] = glm::vec4(scale[1], 0.f);
+			M[2] = glm::vec4(scale[2], 0.f);
+
+			glm::mat4 MVP(VP * M);
+
+			glm::vec3 color(1.f);
+
+			flatShader.SetMat4("u_MVP", &MVP[0][0]);
+			flatShader.SetVec3("u_color", &color[0]);
+			screenQuad.Bind();
+			screenQuad.Draw(0);
+			screenQuad.Unbind();
+		}
+		flatShader.StopUsing();
 
 		window.EndUpdate();
 	}

@@ -66,18 +66,7 @@ namespace Engine
 		if (!(constraints & 1))
 		{
 			// update linear velocity based on force and mass (linear acceleration)
-			// remove component in response translation direction
 			linearVelocity += accumulatedForce * (fixedDeltaTime * inverseMass);
-
-			if (accumulatedResponseTranslation != glm::vec3(0.f))
-			{
-				glm::vec3 translationNormal = glm::normalize(accumulatedResponseTranslation);
-				float velocityNormalComponent = glm::dot(translationNormal, linearVelocity);
-			
-				// if velocity and translation are opposite in direction
-				if (velocityNormalComponent < 0.f)
-					linearVelocity -= translationNormal * velocityNormalComponent;
-			}
 
 			// apply linear damping
 			linearVelocity *= glm::pow(1.f - glm::clamp(linearDamping, 0.f, 0.999f), fixedDeltaTime);

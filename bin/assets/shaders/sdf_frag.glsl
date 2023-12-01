@@ -1,6 +1,6 @@
 #version 430
 
-#define MAX_DISTANCE 100.
+#define MAX_DISTANCE 200.
 
 uniform vec2 u_nearFar;
 uniform mat4 u_invVP;
@@ -93,6 +93,7 @@ float Tree(vec3 p)
 
 float Sdf(vec3 p)
 {
+	p.y -= 20. * cos(p.x * 0.01 + 1.5) * cos(p.z * 0.01 + 1.5);
 	float plane = p.y - 0.2 * sin(p.x) * sin(p.z);
 	float trees = Tree(RepXZ(p-vec3(0.,1.,0.), vec2(40.)));
 	float hills = length(RepXZ(p + vec3(0., 10., 0.), vec2(34.))) - 12.;
@@ -199,7 +200,7 @@ void main()
 	float shadow = SoftShadow(point + normal * 0.01, -lightDir, 0.3, 100., 8.);
 	float diff = max(0., dot(normal, -lightDir));
 	float spec = pow(max(0., dot(reflected, -lightDir)), 16.);
-	vec3 tint = mix(vec3(0.5, 0.4, 0.3), vec3(0.9, 0.9, 1.), min(normal.y, 1.));
+	vec3 tint = mix(vec3(0.5, 0.4, 0.3), vec3(0.8, 0.8, 1.), min(normal.y, 1.));
 	vec3 col = tint * (amb + vec3(shadow * (diff + spec)));
 	
 	o_color = vec4(col, 1.);

@@ -5,11 +5,11 @@
 Player::Player() :
 	p_physicsWorld(nullptr),
 	cameraTransform(1.f),
-	movementSpeed(12.f),
-	jumpHeight(2.f),
+	movementSpeed(22.f),
+	jumpHeight(6.f),
 	cameraPitch(0.f),
 	cameraYaw(0.f),
-	sensitivity(0.003f)
+	sensitivity(0.2f)
 {}
 
 glm::vec3 Player::GetCameraPos()
@@ -69,7 +69,11 @@ void Player::Update(float deltaTime)
 	rigidbody.linearVelocity = ClampMagnitude(move, 1.f) * movementSpeed + glm::vec3(0.f, velY, 0.f);
 
 	if (IP.GetKey(GLFW_KEY_SPACE).WasPressed() && IsOnGround())
+	{
 		rigidbody.linearVelocity.y = glm::sqrt(2.f * 9.82f * jumpHeight);
+		rigidbody.centerOfMass.y += 0.4f;
+		collider.worldMatrix[3].y += 0.4f;
+	}
 
 	static bool mouseIsVisible = false;
 
@@ -78,8 +82,8 @@ void Player::Update(float deltaTime)
 
 	if (!mouseIsVisible)
 	{
-		cameraYaw += (float)mouse.movement.dx * sensitivity;
-		cameraPitch += (float)mouse.movement.dy * sensitivity;
+		cameraYaw += (float)mouse.movement.dx * sensitivity * deltaTime;
+		cameraPitch += (float)mouse.movement.dy * sensitivity * deltaTime;
 	}
 
 	cameraPitch = glm::clamp(cameraPitch, -1.5f, 1.5f);
@@ -101,9 +105,7 @@ void Player::Update(float deltaTime)
 	{
 		if (p_obj != nullptr)
 		{
-			p_obj->p_rigidbody->SetLockPosition(false);
-			p_obj->p_rigidbody->SetLockRotation(false);
-			p_obj->p_rigidbody->AddImpulse(camForward * 10000.f);
+			p_obj->p_rigidbody->AddImpulse(camForward * 4000.f);
 			p_obj = nullptr;
 		}
 		else
@@ -113,8 +115,6 @@ void Player::Update(float deltaTime)
 
 			if (p_obj != nullptr)
 			{
-				p_obj->p_rigidbody->SetLockPosition(true);
-				p_obj->p_rigidbody->SetLockRotation(true);
 				glm::mat4 holdTransform = p_obj->p_collider->worldMatrix;
 				holdTransform[3] = glm::vec4(glm::vec3(cameraTransform[3] + holdDistance * glm::normalize(holdTransform[3] - cameraTransform[3])), 1.f);
 				relativeTransform = glm::inverse(cameraTransform) * holdTransform;
@@ -125,7 +125,10 @@ void Player::Update(float deltaTime)
 	if (p_obj != nullptr)
 	{
 		glm::mat4 objTransform = cameraTransform * relativeTransform;
-		p_obj->p_rigidbody->centerOfMass = objTransform[3];
+		glm::vec3 toGoal = glm::vec3(objTransform[3]) - p_obj->p_rigidbody->centerOfMass;
+		float springConstant = 10000.f;
+		p_obj->p_rigidbody->AddForce(toGoal * springConstant);
+		p_obj->p_rigidbody->linearVelocity *= 0.8f;
 		p_obj->p_rigidbody->rotation = glm::quat_cast(glm::mat3(objTransform));
 	}
 }
