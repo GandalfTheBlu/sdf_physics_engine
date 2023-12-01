@@ -3,8 +3,21 @@
 
 namespace Engine
 {
-	void GenerateUnitQuad(RenderMesh& outMesh);
-	void GenerateUnitLine(RenderMesh& outMesh);
-	void GenerateUnitCube(RenderMesh& outMesh);
-	void GenerateUnitSphere(RenderMesh& outMesh);
+	struct MeshGeneratorSettings
+	{
+		enum : int
+		{
+			E_Default = 0,
+			E_Normals = 1,
+			E_Uvs = 2
+		};
+
+		int value;
+	};
+
+	void GenerateUnitQuad(RenderMesh& outMesh, MeshGeneratorSettings settings = { MeshGeneratorSettings::E_Default });
+	void GenerateUnitLine(RenderMesh& outMesh, MeshGeneratorSettings settings = { MeshGeneratorSettings::E_Default });
+	void GenerateUnitCube(RenderMesh& outMesh, MeshGeneratorSettings settings = { MeshGeneratorSettings::E_Default });
+	void GenerateUnitSphere(RenderMesh& outMesh, MeshGeneratorSettings settings = { MeshGeneratorSettings::E_Default });
+	void GenerateUnitCapsule(RenderMesh& outMesh, MeshGeneratorSettings settings = { MeshGeneratorSettings::E_Default });
 }

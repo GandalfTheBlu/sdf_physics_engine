@@ -16,8 +16,9 @@ namespace Engine
 
 	void TextureCube::Reload(const std::string texturePaths[6])
 	{
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+        GLuint newTexture = 0;
+        glGenTextures(1, &newTexture);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, newTexture);
 
         int width = 0;
         int height = 0;
@@ -35,8 +36,8 @@ namespace Engine
             }
             else
             {
-                Affirm(false, "failed to load cube map texture '", texturePaths[i], "'");
                 stbi_image_free(data);
+                Affirm(false, "failed to load cube map texture '", texturePaths[i], "'");
             }
         }
 
@@ -46,6 +47,11 @@ namespace Engine
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+        if (texture != 0)
+            glDeleteTextures(1, &texture);
+
+        texture = newTexture;
 	}
 
     void TextureCube::Bind(GLuint binding) const
@@ -58,5 +64,66 @@ namespace Engine
     {
         glActiveTexture(binding);
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    }
+
+
+    Texture2D::Texture2D() : 
+        texture(0)
+    {}
+
+    Texture2D::~Texture2D()
+    {
+        glDeleteTextures(1, &texture);
+    }
+
+    void Texture2D::Reload(const std::string& texturePath)
+    {
+        stbi_set_flip_vertically_on_load(true);
+
+        int colorChannels = 0;
+        int width = 0;
+        int height = 0;
+        unsigned char* data = stbi_load(texturePath.c_str(), &width, &height, &colorChannels, 0);
+        Affirm(data != nullptr, "failed to load texture '", texturePath, "'");
+
+        GLenum glFormat = GL_RGB;
+        switch (colorChannels)
+        {
+        case 1:
+            glFormat = GL_R;
+            break;
+        case 2:
+            glFormat = GL_RG;
+            break;
+        case 3:
+            glFormat = GL_RGB;
+            break;
+        case 4:
+            glFormat = GL_RGBA;
+            break;
+        }
+
+        if (texture != 0)
+            glDeleteTextures(1, &texture);
+
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, (GLint)glFormat, width, height, 0, glFormat, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        stbi_image_free(data);
+    }
+
+    void Texture2D::Bind(GLuint binding) const
+    {
+        glActiveTexture(binding);
+        glBindTexture(GL_TEXTURE_2D, texture);
+    }
+
+    void Texture2D::Unbind(GLuint binding) const
+    {
+        glActiveTexture(binding);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 }

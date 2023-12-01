@@ -1,17 +1,12 @@
 #version 430
 
-#define MAX_SPHERES 20
-#define MAX_CAPSULES 10
 #define MAX_DISTANCE 100.
 
 uniform vec2 u_nearFar;
 uniform mat4 u_invVP;
 uniform vec3 u_camPos;
 uniform float u_pixelRadius;
-uniform vec4 u_spheres[MAX_SPHERES];
-uniform int u_sphereCount;
-uniform vec4 u_capsules[MAX_CAPSULES * 2];
-uniform int u_capsuleCount;
+uniform float u_time;
 
 layout(location=0) in vec2 v_position;
 
@@ -41,11 +36,11 @@ float Capsule(vec3 p, vec3 a, vec3 b, float r)
 	return length(pa - ba * h) - r;
 }
 
-float Box(vec3 p, vec3 b)
-{
-	vec3 q = abs(p) - b;
-	return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.);
-}
+//float Box(vec3 p, vec3 b)
+//{
+//	vec3 q = abs(p) - b;
+//	return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.);
+//}
 
 vec3 RepXZ(vec3 p, vec2 s)
 {
@@ -67,12 +62,14 @@ vec3 Fold(vec3 p, vec3 n)
 
 float Tree(vec3 p)
 {	
+	vec3 q = p;
+
 	vec2 dim = vec2(1., 8.);
 	float d = Capsule(p, vec3(0., -1., 0.), vec3(0., 1. + dim.y, 0.), dim.x);
 	vec3 scale = vec3(1.);
-	vec3 change = vec3(0.6,0.75,0.6);
+	vec3 change = vec3(0.7,0.68,0.7);
 	
-	vec3 n1 = normalize(vec3(1., 0., 1.)); 
+	vec3 n1 = normalize(vec3(1. + 0.1 * cos(u_time), 0., 1.)); 
 	vec3 n2 = vec3(n1.x, 0., -n1.z);
 	vec3 n3 = vec3(-n1.x, 0., n1.z);
 	
@@ -88,31 +85,18 @@ float Tree(vec3 p)
 		
 		scale *= change;
 		
-		d = min(d, Capsule(p, vec3(0.), vec3(0., dim.y * scale.y, 0.), scale.x*dim.x));
+		d = SmoothUnion(d, Capsule(p, vec3(0.), vec3(0., dim.y * scale.y, 0.), scale.x*dim.x), 0.4);
 	}
 	
-	return d;
+	return d - 0.06 * cos(q.x * 4.) * cos(q.y * 3.) * cos(q.z * 4.);
 }
 
 float Sdf(vec3 p)
 {
-	float d = 100000.;
-	
-	for(int i=0; i<u_sphereCount; i++)
-		d = min(d, distance(u_spheres[i].xyz, p) - u_spheres[i].w);
-	
-	for(int i=0; i+1<u_capsuleCount * 2; i+=2)
-	{
-		vec4 aAndR = u_capsules[i];
-		vec3 b = u_capsules[i+1].xyz;
-		d = min(d, Capsule(p, aAndR.xyz, b, aAndR.w));
-	}
-	
-	float plane = p.y;
+	float plane = p.y - 0.2 * sin(p.x) * sin(p.z);
 	float trees = Tree(RepXZ(p-vec3(0.,1.,0.), vec2(40.)));
-	plane = min(plane, trees);
-	
-	return SmoothUnion(d, plane, 0.6);
+	float hills = length(RepXZ(p + vec3(0., 10., 0.), vec2(34.))) - 12.;
+	return SmoothUnion(plane, min(trees, hills), 0.8);
 }
 
 vec3 CalcNormal(vec3 p)
@@ -215,7 +199,7 @@ void main()
 	float shadow = SoftShadow(point + normal * 0.01, -lightDir, 0.3, 100., 8.);
 	float diff = max(0., dot(normal, -lightDir));
 	float spec = pow(max(0., dot(reflected, -lightDir)), 16.);
-	vec3 tint = mix(vec3(0.7, 0.6, 0.5), vec3(0.5, 0.6, 0.7), min(point.y, 1.));
+	vec3 tint = mix(vec3(0.5, 0.4, 0.3), vec3(0.9, 0.9, 1.), min(normal.y, 1.));
 	vec3 col = tint * (amb + vec3(shadow * (diff + spec)));
 	
 	o_color = vec4(col, 1.);

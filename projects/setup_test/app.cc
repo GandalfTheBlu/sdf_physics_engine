@@ -39,14 +39,16 @@ float Capsule(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, float 
 	return glm::length(pa - ba * h) - r;
 }
 
+static float totalTime = 0.f;
+
 float Tree(glm::vec3 p)
 {
 	glm::vec2 dim = glm::vec2(1.f, 8.f);
 	float d = Capsule(p, glm::vec3(0.f, -1.f, 0.f), glm::vec3(0.f, 1.f + dim.y, 0.f), dim.x);
 	glm::vec3 scale = glm::vec3(1.f);
-	glm::vec3 change = glm::vec3(0.6f, 0.75f, 0.6f);
+	glm::vec3 change = glm::vec3(0.7f, 0.68f, 0.7f);
 
-	glm::vec3 n1 = normalize(glm::vec3(1., 0., 1.));
+	glm::vec3 n1 = normalize(glm::vec3(1.f + 0.1f * glm::cos(totalTime), 0.f, 1.f));
 	glm::vec3 n2 = glm::vec3(n1.x, 0.f, -n1.z);
 	glm::vec3 n3 = glm::vec3(-n1.x, 0.f, n1.z);
 
@@ -67,11 +69,18 @@ float Tree(glm::vec3 p)
 	return d;
 }
 
+float SmoothUnion(float d1, float d2, float k)
+{
+	float h = glm::clamp(0.5f + 0.5f * (d2 - d1) / k, 0.f, 1.f);
+	return glm::mix(d2, d1, h) - k * h * (1.f - h);
+}
+
 float WorldSDF(const glm::vec3& p)
 {
-	float plane = p.y;
-	float huts = Tree(RepXZ(p - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
-	plane = glm::min(plane, huts);
+	float plane = p.y - 0.2f * glm::sin(p.x) * glm::sin(p.z);
+	float trees = Tree(RepXZ(p - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
+	float hills = glm::length(RepXZ(p + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
+	return SmoothUnion(plane, glm::min(trees, hills), 0.8f);
 	return plane;
 }
 
@@ -83,6 +92,7 @@ void App_SetupTest::Init()
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
 
 	physicsWorld.Init(WorldSDF, { 0.2f, 0.4f });
+	physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 	for (size_t i = 0; i < spheres.size(); i++)
 	{
@@ -129,15 +139,16 @@ void App_SetupTest::Init()
 
 void App_SetupTest::UpdateLoop()
 {
-	Engine::RenderMesh screenQuad;
+	Engine::RenderMesh screenQuad, cubeMesh, sphereMesh, capsuleMesh;
 	Engine::GenerateUnitQuad(screenQuad);
-	Engine::Shader sdfShader;
-	sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
+	Engine::GenerateUnitCube(cubeMesh);
+	Engine::GenerateUnitSphere(sphereMesh, {Engine::MeshGeneratorSettings::E_Normals | Engine::MeshGeneratorSettings::E_Uvs});
+	Engine::GenerateUnitCapsule(capsuleMesh, { Engine::MeshGeneratorSettings::E_Normals | Engine::MeshGeneratorSettings::E_Uvs});
 
-	Engine::RenderMesh cube;
-	Engine::GenerateUnitCube(cube);
-	Engine::Shader flatShader;
-	flatShader.Reload("assets/shaders/flat_vert.glsl", "assets/shaders/flat_frag.glsl");
+	Engine::Shader sdfShader, phongShader, skyboxShader;
+	sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
+	phongShader.Reload("assets/shaders/phong_textured_vert.glsl", "assets/shaders/phong_textured_frag.glsl");
+	skyboxShader.Reload("assets/shaders/skybox_vert.glsl", "assets/shaders/skybox_frag.glsl");
 
 	Engine::TextureCube skyboxTexture;
 	std::string skyboxTexturePaths[6]
@@ -151,17 +162,18 @@ void App_SetupTest::UpdateLoop()
 	};
 	skyboxTexture.Reload(skyboxTexturePaths);
 
-	Engine::Shader skyboxShader;
-	skyboxShader.Reload("assets/shaders/skybox_vert.glsl", "assets/shaders/skybox_frag.glsl");
+	Engine::Texture2D objectTexture;
+	objectTexture.Reload("assets/textures/image.png");
+
+	glm::vec3 lightDir(glm::normalize(glm::vec3(-0.5f, -1.f, 0.8f)));
 
 	float pixelRadius = 0.5f * glm::length(glm::vec2(1.f / window.Width(), 1.f / window.Height()));
-
 	float fixedDeltaTime = 1.f / 60.f;
-
 	bool mouseVisible = false;
 
 	while (!window.ShouldClose())
 	{
+		totalTime += fixedDeltaTime;
 		window.BeginUpdate();
 
 		auto& IP = Engine::Input::Instance();
@@ -170,9 +182,6 @@ void App_SetupTest::UpdateLoop()
 
 		if(IP.GetKey(GLFW_KEY_R).WasPressed())
 			sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
-
-		if(IP.GetKey(GLFW_KEY_ENTER).WasPressed())
-			physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 		physicsWorld.Update(fixedDeltaTime);
 		
@@ -187,29 +196,15 @@ void App_SetupTest::UpdateLoop()
 		skyboxShader.Use();
 		skyboxShader.SetMat4("u_VP", &skyboxVP[0][0]);
 		skyboxTexture.Bind(GL_TEXTURE0);
-		cube.Bind();
+		cubeMesh.Bind();
 		glDepthMask(GL_FALSE);
 		glCullFace(GL_FRONT);
-		cube.Draw(0);
+		cubeMesh.Draw(0);
 		glDepthMask(GL_TRUE);
 		glCullFace(GL_BACK);
-		cube.Unbind();
+		cubeMesh.Unbind();
 		skyboxTexture.Unbind(GL_TEXTURE0);
 		skyboxShader.StopUsing();
-
-		glm::vec4 spheresData[20];
-		for(size_t i=0; i<spheres.size(); i++)
-			spheresData[i] = glm::vec4(spheres[i].rb.centerOfMass, spheres[i].collider.radius);
-
-		glm::vec4 capsulesData[2 * 10];
-		for (size_t i = 0; i < capsules.size(); i++)
-		{
-			float h0 = capsules[i].collider.height * 0.5f;
-			glm::vec3 pa = capsules[i].collider.worldMatrix * glm::vec4(0.f, h0, 0.f, 1.f);
-			glm::vec3 pb = capsules[i].collider.worldMatrix * glm::vec4(0.f, -h0, 0.f, 1.f);
-			capsulesData[i * 2] = glm::vec4(pa, capsules[i].collider.radius);
-			capsulesData[i * 2 + 1] = glm::vec4(pb, 0.f);
-		}
 
 		glm::vec2 nearFar(player.camera.GetNearPlane(), player.camera.GetFarPlane());
 
@@ -218,27 +213,61 @@ void App_SetupTest::UpdateLoop()
 		sdfShader.SetMat4("u_invVP", &invVP[0][0]);
 		sdfShader.SetVec3("u_camPos", &player.cameraTransform[3][0]);
 		sdfShader.SetFloat("u_pixelRadius", pixelRadius);
-		sdfShader.SetVec4("u_spheres", &spheresData[0][0], 20);
-		sdfShader.SetInt("u_sphereCount", spheres.size());
-		sdfShader.SetVec4("u_capsules", &capsulesData[0][0], 10 * 2);
-		sdfShader.SetInt("u_capsuleCount", capsules.size());
+		sdfShader.SetFloat("u_time", totalTime);
 		screenQuad.Bind();
 		screenQuad.Draw(0);
 		screenQuad.Unbind();
 		sdfShader.StopUsing();
 
-		glm::mat4 M(1.f);
-		M[3] = glm::vec4(0.f, 4.f, 16.f, 1.f);
-		glm::mat4 MVP = VP * M;
-		glm::vec3 color(1.f, 0.5f, 0.5f);
 
-		flatShader.Use();
-		flatShader.SetMat4("u_MVP", &MVP[0][0]);
-		flatShader.SetVec3("u_color", &color[0]);
-		cube.Bind();
-		cube.Draw(0);
-		cube.Unbind();
-		flatShader.StopUsing();
+		phongShader.Use();
+		phongShader.SetVec3("u_camPos", &player.cameraTransform[3][0]);
+		phongShader.SetVec3("u_lightDir", &lightDir[0]);
+		glm::vec3 textureScale(1.f);
+		phongShader.SetVec2("u_textureScale", &textureScale[0]);
+		objectTexture.Bind(GL_TEXTURE0);
+
+		for (size_t i = 0; i < spheres.size(); i++)
+		{
+			glm::mat4 M = glm::mat4(glm::mat3_cast(spheres[i].rb.rotation) * glm::mat3(spheres[i].collider.radius));
+			M[3] = glm::vec4(spheres[i].rb.centerOfMass, 1.f);
+			glm::mat4 MVP = VP * M;
+			glm::mat3 N = glm::transpose(glm::inverse(glm::mat3(M)));
+			glm::vec3 color(1.f, 0.9f, 0.9f);
+
+			phongShader.SetMat4("u_MVP", &MVP[0][0]);
+			phongShader.SetMat4("u_M", &M[0][0]);
+			phongShader.SetMat3("u_N", &N[0][0]);
+			phongShader.SetVec3("u_color", &color[0]);
+			phongShader.SetFloat("u_roughness", 0.5f);
+			sphereMesh.Bind();
+			sphereMesh.Draw(0);
+			sphereMesh.Unbind();
+		}
+		for (size_t i = 0; i < capsules.size(); i++)
+		{
+			glm::mat4 M = glm::mat4(glm::mat3_cast(capsules[i].rb.rotation) * glm::mat3(
+				capsules[i].collider.radius, 0.f, 0.f,
+				0.f, capsules[i].collider.height/2.f, 0.f,
+				0.f, 0.f, capsules[i].collider.radius
+			));
+
+			M[3] = glm::vec4(capsules[i].rb.centerOfMass, 1.f);
+			glm::mat4 MVP = VP * M;
+			glm::mat3 N = glm::transpose(glm::inverse(glm::mat3(M)));
+			glm::vec3 color(0.9f, 1.f, 1.f);
+
+			phongShader.SetMat4("u_MVP", &MVP[0][0]);
+			phongShader.SetMat4("u_M", &M[0][0]);
+			phongShader.SetMat3("u_N", &N[0][0]);
+			phongShader.SetVec3("u_color", &color[0]);
+			phongShader.SetFloat("u_roughness", 0.5f);
+			capsuleMesh.Bind();
+			capsuleMesh.Draw(0);
+			capsuleMesh.Unbind();
+		}
+		objectTexture.Unbind(GL_TEXTURE0);
+		phongShader.StopUsing();
 
 		window.EndUpdate();
 	}

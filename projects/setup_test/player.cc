@@ -93,13 +93,39 @@ void Player::Update(float deltaTime)
 
 	glm::vec3 camForward = cameraTransform[2];
 
+	static Engine::PhysicsObject* p_obj = nullptr;
+	static glm::mat4 relativeTransform(1.f);
+	float holdDistance = 10.f;
+
 	if (mouse.leftButton.WasPressed())
 	{
-		Engine::HitResult hit;
-		Engine::PhysicsObject* p_obj = p_physicsWorld->RaycastObjects(camPos, camForward, 100.f, hit, &collider);
 		if (p_obj != nullptr)
 		{
-			p_obj->p_rigidbody->AddImpulseAtPoint(camForward * 500.f, hit.point);
+			p_obj->p_rigidbody->SetLockPosition(false);
+			p_obj->p_rigidbody->SetLockRotation(false);
+			p_obj->p_rigidbody->AddImpulse(camForward * 10000.f);
+			p_obj = nullptr;
 		}
+		else
+		{
+			Engine::HitResult hit;
+			p_obj = p_physicsWorld->RaycastObjects(camPos, camForward, 100.f, hit, &collider);
+
+			if (p_obj != nullptr)
+			{
+				p_obj->p_rigidbody->SetLockPosition(true);
+				p_obj->p_rigidbody->SetLockRotation(true);
+				glm::mat4 holdTransform = p_obj->p_collider->worldMatrix;
+				holdTransform[3] = glm::vec4(glm::vec3(cameraTransform[3] + holdDistance * glm::normalize(holdTransform[3] - cameraTransform[3])), 1.f);
+				relativeTransform = glm::inverse(cameraTransform) * holdTransform;
+			}
+		}
+	}
+
+	if (p_obj != nullptr)
+	{
+		glm::mat4 objTransform = cameraTransform * relativeTransform;
+		p_obj->p_rigidbody->centerOfMass = objTransform[3];
+		p_obj->p_rigidbody->rotation = glm::quat_cast(glm::mat3(objTransform));
 	}
 }

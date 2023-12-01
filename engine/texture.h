@@ -18,4 +18,19 @@ namespace Engine
 		void Bind(GLuint binding) const;
 		void Unbind(GLuint binding) const;
 	};
+
+	class Texture2D
+	{
+	private:
+		GLuint texture;
+
+	public:
+		Texture2D();
+		~Texture2D();
+
+		void Reload(const std::string& texturePath);
+
+		void Bind(GLuint binding) const;
+		void Unbind(GLuint bindine) const;
+	};
 }

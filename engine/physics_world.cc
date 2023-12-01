@@ -141,7 +141,8 @@ namespace Engine
 
 		// transform relative velocity to contact space
 		glm::vec3 contactVel = worldToContact * relativeVel;
-		float desiredNormalVelocity = -contactVel.x * (1.f + restitution);
+		float desiredNormalVelocity = glm::abs(contactVel.x * (1.f + restitution));
+
 		float totalInverseMass = p_firstRb->inverseMass;
 
 		// build matrix that converts a unit of impulse to a unit of torque
@@ -188,31 +189,31 @@ namespace Engine
 		);
 
 		// calculate the contact-space impulse needed to produce the velocity subtraction
-		glm::vec3 impulse(impulseMatrix * subtractVel);
+ 		glm::vec3 contactImpulse(impulseMatrix * subtractVel);
 
 		// calculate the length of the impulse in the contact plane
 		float planarImpulse = glm::sqrt(
-			impulse.y * impulse.y +
-			impulse.z * impulse.z
+			contactImpulse.y * contactImpulse.y +
+			contactImpulse.z * contactImpulse.z
 		);
 
 		// check if the planar component of the impulse exceeds the static friction limit
 		// if it does, we change the impulse to simulate dynamic friction
-		if (planarImpulse > impulse.x * friction)
+		if (planarImpulse > contactImpulse.x * friction)
 		{
-			impulse.y /= planarImpulse;
-			impulse.z /= planarImpulse;
+			contactImpulse.y /= planarImpulse;
+			contactImpulse.z /= planarImpulse;
 		
-			impulse.x = deltaVelContact[0][0] +
-				deltaVelContact[0][1] * friction * impulse.y +
-				deltaVelContact[0][2] * friction * impulse.z;
-			impulse.x = desiredNormalVelocity / impulse.x;
-			impulse.y *= friction * impulse.x;
-			impulse.z *= friction * impulse.x;
+			contactImpulse.x = deltaVelContact[0][0] +
+				deltaVelContact[0][1] * friction * contactImpulse.y +
+				deltaVelContact[0][2] * friction * contactImpulse.z;
+			contactImpulse.x = desiredNormalVelocity / contactImpulse.x;
+			contactImpulse.y *= friction * contactImpulse.x;
+			contactImpulse.z *= friction * contactImpulse.x;
 		}
 
 		// convert back to world space
-		impulse = contactToWorld * impulse;
+		glm::vec3 impulse = contactToWorld * contactImpulse;
 
 		return impulse;
 	}
