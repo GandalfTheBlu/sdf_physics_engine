@@ -4,6 +4,8 @@
 
 SET(engine_files 
 	debug.h
+	file_watcher.h
+	file_watcher.cc
 	input.h
 	input.cc
 	window.h

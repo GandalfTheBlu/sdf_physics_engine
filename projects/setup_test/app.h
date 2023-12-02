@@ -3,8 +3,27 @@
 #include <array>
 #include "program_handle.h"
 #include "shader.h"
+#include "file_watcher.h"
 
-void InitProgram(Tolo::ProgramHandle& program);
+class SdfObject
+{
+private:
+	void InitProgram(Tolo::ProgramHandle& program);
+
+public:
+	Tolo::ProgramHandle* p_program;
+	Engine::Shader shader;
+
+	std::array<Engine::FileWatcher*, 3> fileWatchers;
+
+	SdfObject();
+	~SdfObject();
+
+
+	void Init(const std::string& vertShaderPath, const std::string& fragShaderPath, const std::string& sdfPath);
+	void Reload();
+	void Update();
+};
 
 class App_SetupTest
 {
@@ -22,9 +41,8 @@ public:
 	};
 
 	Engine::Window window;
-	Tolo::ProgramHandle* p_worldSdfProgram;
+	SdfObject worldSdfObject;
 	Engine::PhysicsWorld physicsWorld;
-	Engine::Shader sdfShader;
 	Player player;
 	std::array<Sphere, 10> spheres;
 	std::array<Capsule, 10> capsules;

@@ -6,9 +6,9 @@
 #include "program_handle.h"
 #include "debug.h"
 
-App_SetupTest::App_SetupTest() :
-	p_worldSdfProgram(nullptr)
-{}
+static float totalTime = 0.f;
+App_SetupTest* p_currentApp = nullptr;
+
 
 float Box(const glm::vec3& p, const glm::vec3& b)
 {
@@ -41,8 +41,6 @@ float Capsule(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, float 
 	float h = glm::clamp(glm::dot(pa, ba) / glm::dot(ba, ba), 0.f, 1.f);
 	return glm::length(pa - ba * h) - r;
 }
-
-static float totalTime = 0.f;
 
 float Tree(glm::vec3 p)
 {
@@ -78,8 +76,6 @@ float SmoothUnion(float d1, float d2, float k)
 	return glm::mix(d2, d1, h) - k * h * (1.f - h);
 }
 
-App_SetupTest* p_currentApp = nullptr;
-
 float WorldSDF(const glm::vec3& p)
 {
 	//glm::vec3 q = p;
@@ -89,10 +85,26 @@ float WorldSDF(const glm::vec3& p)
 	//float hills = glm::length(RepXZ(q + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
 	//return SmoothUnion(plane, glm::min(trees, hills), 0.8f);
 
-	return p_currentApp->p_worldSdfProgram->Execute<float>(p);
+	return p_currentApp->worldSdfObject.p_program->Execute<float>(p);
 }
 
-void InitProgram(Tolo::ProgramHandle& program)
+
+SdfObject::SdfObject() :
+	p_program(nullptr)
+{
+	for (size_t i = 0; i < fileWatchers.size(); i++)
+		fileWatchers[i] = new Engine::FileWatcher();
+}
+
+SdfObject::~SdfObject()
+{
+	delete p_program;
+	
+	for (size_t i = 0; i < fileWatchers.size(); i++)
+		delete fileWatchers[i];
+}
+
+void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 {
 	program.AddStruct({
 		"vec3",
@@ -175,6 +187,57 @@ void InitProgram(Tolo::ProgramHandle& program)
 	});
 }
 
+void SdfObject::Init(const std::string& vertShaderPath, const std::string& fragShaderPath, const std::string& sdfPath)
+{
+	fileWatchers[0]->Init(vertShaderPath);
+	fileWatchers[1]->Init(fragShaderPath);
+	fileWatchers[2]->Init(sdfPath);
+
+	Reload();
+}
+
+void SdfObject::Reload()
+{
+	Engine::Info("compiling sdf object");
+
+	Tolo::ProgramHandle* p_newProgram = nullptr;
+	std::string sdfCode;
+	try
+	{
+		p_newProgram = new Tolo::ProgramHandle(fileWatchers[2]->filePath, 1024, "Sdf");
+		InitProgram(*p_newProgram);
+		p_newProgram->Compile(sdfCode);
+	}
+	catch (const Tolo::Error& error)
+	{
+		delete p_newProgram;
+		error.Print();
+		Engine::Info("failed to compile sdf object, keeping old version");
+		return;
+	}
+
+	shader.Reload(fileWatchers[0]->filePath, fileWatchers[1]->filePath, { "__SDF__", sdfCode });
+
+	delete p_program;
+	p_program = p_newProgram;
+}
+
+void SdfObject::Update()
+{
+	for (size_t i = 0; i < fileWatchers.size(); i++)
+	{
+		if (fileWatchers[i]->NewVersionAvailable())
+		{
+			Reload();
+			break;
+		}
+	}
+}
+
+
+App_SetupTest::App_SetupTest()
+{}
+
 void App_SetupTest::Init()
 {
 	p_currentApp = this;
@@ -184,20 +247,7 @@ void App_SetupTest::Init()
 	window.SetMouseVisible(false);
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
 
-	std::string sdfCode;
-	try
-	{
-		p_worldSdfProgram = new Tolo::ProgramHandle("assets/tolo/test.tolo", 1024, "Sdf");
-		InitProgram(*p_worldSdfProgram);
-		p_worldSdfProgram->Compile(sdfCode);
-	}
-	catch (const Tolo::Error& error)
-	{
-		error.Print();
-		Engine::Affirm(false, "assets/tolo/test.tolo failed to compile");
-	}
-
-	sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl", { "__SDF__", sdfCode });
+	worldSdfObject.Init("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl", "assets/tolo/test.tolo");
 
 
 	physicsWorld.Init(WorldSDF, { 0.2f, 0.4f });
@@ -287,12 +337,11 @@ void App_SetupTest::UpdateLoop()
 		totalTime += fixedDeltaTime;
 		window.BeginUpdate();
 
+		worldSdfObject.Update();
+
 		auto& IP = Engine::Input::Instance();
 		if (IP.GetKey(GLFW_KEY_ESCAPE).WasPressed())
 			window.SetMouseVisible(mouseVisible = !mouseVisible);
-
-		if(IP.GetKey(GLFW_KEY_R).WasPressed())
-			sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
 
 		physicsWorld.Update(fixedDeltaTime);
 
@@ -339,6 +388,8 @@ void App_SetupTest::UpdateLoop()
 		skyboxShader.StopUsing();
 
 		glm::vec2 nearFar(player.camera.GetNearPlane(), player.camera.GetFarPlane());
+
+		Engine::Shader& sdfShader = worldSdfObject.shader;
 
 		sdfShader.Use();
 		sdfShader.SetVec2("u_nearFar", &nearFar[0]);
