@@ -3,8 +3,11 @@
 #include "shader.h"
 #include "texture.h"
 #include "input.h"
+#include "program_handle.h"
+#include "debug.h"
 
-App_SetupTest::App_SetupTest()
+App_SetupTest::App_SetupTest() :
+	p_worldSdfProgram(nullptr)
 {}
 
 float Box(const glm::vec3& p, const glm::vec3& b)
@@ -13,7 +16,7 @@ float Box(const glm::vec3& p, const glm::vec3& b)
 	return glm::length(glm::max(q, 0.f)) + glm::min(glm::max(q.x, glm::max(q.y, q.z)), 0.f);
 }
 
-glm::vec3 RepXZ(const glm::vec3& p, const glm::vec2& s)
+glm::vec3 RepXZ(const glm::vec3 p, const glm::vec2& s)
 {
 	glm::vec2 q = s * glm::round(glm::vec2(p.x, p.z) / s);
 	return p - glm::vec3(q.x, 0.f, q.y);
@@ -75,23 +78,127 @@ float SmoothUnion(float d1, float d2, float k)
 	return glm::mix(d2, d1, h) - k * h * (1.f - h);
 }
 
+App_SetupTest* p_currentApp = nullptr;
+
 float WorldSDF(const glm::vec3& p)
 {
-	glm::vec3 q = p;
-	q.y -= 20. * cos(q.x * 0.01 + 1.5) * cos(q.z * 0.01 + 1.5);
-	float plane = q.y - 0.2f * glm::sin(q.x) * glm::sin(q.z);
-	float trees = Tree(RepXZ(q - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
-	float hills = glm::length(RepXZ(q + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
-	return SmoothUnion(plane, glm::min(trees, hills), 0.8f);
-	return plane;
+	//glm::vec3 q = p;
+	//q.y -= 20. * cos(q.x * 0.01 + 1.5) * cos(q.z * 0.01 + 1.5);
+	//float plane = q.y - 0.2f * glm::sin(q.x) * glm::sin(q.z);
+	//float trees = Tree(RepXZ(q - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
+	//float hills = glm::length(RepXZ(q + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
+	//return SmoothUnion(plane, glm::min(trees, hills), 0.8f);
+
+	return p_currentApp->p_worldSdfProgram->Execute<float>(p);
+}
+
+void InitProgram(Tolo::ProgramHandle& program)
+{
+	program.AddStruct({
+		"vec3",
+		{
+			{"float", "x"},
+			{"float", "y"},
+			{"float", "z"}
+		}
+	});
+	program.AddFunction({ "vec3", "operator+", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+			glm::vec3 b = Tolo::Pop<glm::vec3>(vm);
+			Tolo::PushStruct<glm::vec3>(vm, a + b);
+		}
+	});
+	program.AddFunction({ "vec3", "operator-", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+			glm::vec3 b = Tolo::Pop<glm::vec3>(vm);
+			Tolo::PushStruct<glm::vec3>(vm, a - b);
+		}
+	});
+	program.AddFunction({ "vec3", "operator-", {"vec3"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+			Tolo::PushStruct<glm::vec3>(vm, -a);
+		}
+	});
+	program.AddFunction({ "vec3", "operator*", {"vec3", "float"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+			float b = Tolo::Pop<float>(vm);
+			Tolo::PushStruct<glm::vec3>(vm, a * b);
+		}
+	});
+	program.AddFunction({ "float", "length", {"vec3"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 v = Tolo::Pop<glm::vec3>(vm);
+			Tolo::Push<Tolo::Float>(vm, glm::length(v));
+		}
+	});
+	program.AddFunction({ "float", "normalize", {"vec3"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 v = Tolo::Pop<glm::vec3>(vm);
+			Tolo::PushStruct<glm::vec3>(vm, glm::normalize(v));
+		}
+	});
+	program.AddFunction({ "float", "sin", {"float"}, [](Tolo::VirtualMachine& vm)
+		{
+			float a = Tolo::Pop<float>(vm);
+			Tolo::Push<float>(vm, glm::sin(a));
+		}
+	});
+	program.AddFunction({ "float", "cos", {"float"}, [](Tolo::VirtualMachine& vm)
+		{
+			float a = Tolo::Pop<float>(vm);
+			Tolo::Push<float>(vm, glm::cos(a));
+		}
+	});
+	program.AddFunction({ "float", "min", {"float", "float"}, [](Tolo::VirtualMachine& vm)
+		{
+			float a = Tolo::Pop<float>(vm);
+			float b = Tolo::Pop<float>(vm);
+			Tolo::Push<float>(vm, glm::min(a, b));
+		} 
+	});
+	program.AddFunction({ "float", "max", {"float", "float"}, [](Tolo::VirtualMachine& vm)
+		{
+			float a = Tolo::Pop<float>(vm);
+			float b = Tolo::Pop<float>(vm);
+			Tolo::Push<float>(vm, glm::max(a, b));
+		}
+	});
+	program.AddFunction({ "float", "Tree", {"vec3"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 p = Tolo::Pop<glm::vec3>(vm);
+			Tolo::Push<float>(vm, Tree(p));
+		}
+	});
 }
 
 void App_SetupTest::Init()
 {
+	p_currentApp = this;
+
 	window.Init(1200, 800, "setup_test");
 	//window.Init(800, 600, "setup_test");
 	window.SetMouseVisible(false);
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
+
+	std::string sdfCode;
+	try
+	{
+		p_worldSdfProgram = new Tolo::ProgramHandle("assets/tolo/test.tolo", 1024, "Sdf");
+		InitProgram(*p_worldSdfProgram);
+		p_worldSdfProgram->Compile(sdfCode);
+	}
+	catch (const Tolo::Error& error)
+	{
+		error.Print();
+		Engine::Affirm(false, "assets/tolo/test.tolo failed to compile");
+	}
+
+	sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl", { "__SDF__", sdfCode });
+
 
 	physicsWorld.Init(WorldSDF, { 0.2f, 0.4f });
 	physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
@@ -102,7 +209,7 @@ void App_SetupTest::Init()
 		float radius = 1.f;
 
 		Engine::Rigidbody& rb = spheres[i].rb;
-		rb.centerOfMass = glm::vec3(0.f, 20.f + i * 3.f, 30.f);
+		rb.centerOfMass = glm::vec3(0.f + glm::cos(float(i)), 20.f + i * 3.f, 30.f);
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::SphereInertiaTensor(radius, mass));
 
@@ -118,7 +225,7 @@ void App_SetupTest::Init()
 		float height = 2.f;
 
 		Engine::Rigidbody& rb = capsules[i].rb;
-		rb.centerOfMass = glm::vec3(0.f, 20.f + i * 4.f, 10.f);
+		rb.centerOfMass = glm::vec3(0.f + glm::cos(float(i)), 20.f + i * 4.f, 10.f);
 		rb.SetMass(mass);
 		rb.SetInertiaTensor(Engine::Rigidbody::CylinderInertiaTensor(radius, height + radius, mass));
 		rb.angularDamping = 0.9f;
@@ -147,8 +254,7 @@ void App_SetupTest::UpdateLoop()
 	Engine::GenerateUnitSphere(sphereMesh, {Engine::MeshGeneratorSettings::E_Normals | Engine::MeshGeneratorSettings::E_Uvs});
 	Engine::GenerateUnitCapsule(capsuleMesh, { Engine::MeshGeneratorSettings::E_Normals | Engine::MeshGeneratorSettings::E_Uvs});
 
-	Engine::Shader sdfShader, phongShader, skyboxShader, flatShader;
-	sdfShader.Reload("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl");
+	Engine::Shader phongShader, skyboxShader, flatShader;
 	phongShader.Reload("assets/shaders/phong_textured_vert.glsl", "assets/shaders/phong_textured_frag.glsl");
 	skyboxShader.Reload("assets/shaders/skybox_vert.glsl", "assets/shaders/skybox_frag.glsl");
 	flatShader.Reload("assets/shaders/flat_vert.glsl", "assets/shaders/flat_frag.glsl");

@@ -1,0 +1,8 @@
+
+
+float Sdf(vec3 p)
+{
+	float plane = p.y - 0.5 * cos(p.x * 0.3) * sin(p.z * 0.3);
+	float tree = Tree(p - vec3(0., 1., 0.));
+	return min(plane, tree);
+}

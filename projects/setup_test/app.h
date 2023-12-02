@@ -1,6 +1,10 @@
 #include "window.h"
 #include "player.h"
 #include <array>
+#include "program_handle.h"
+#include "shader.h"
+
+void InitProgram(Tolo::ProgramHandle& program);
 
 class App_SetupTest
 {
@@ -18,10 +22,12 @@ public:
 	};
 
 	Engine::Window window;
+	Tolo::ProgramHandle* p_worldSdfProgram;
 	Engine::PhysicsWorld physicsWorld;
+	Engine::Shader sdfShader;
 	Player player;
-	std::array<Sphere, 40> spheres;
-	std::array<Capsule, 30> capsules;
+	std::array<Sphere, 10> spheres;
+	std::array<Capsule, 10> capsules;
 
 	App_SetupTest();
 

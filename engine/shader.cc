@@ -32,12 +32,18 @@ namespace Engine
 		}
 	}
 
-	void Shader::Reload(const std::string& vertexFilePath, const std::string& fragmentFilePath)
+	void Shader::Reload(const std::string& vertexFilePath, const std::string& fragmentFilePath, const std::pair<std::string, std::string>& fragmentInsertion)
 	{
 		std::string vertText;
 		std::string fragText;
 		ReadTextFile(vertexFilePath, vertText);
 		ReadTextFile(fragmentFilePath, fragText);
+
+		if (fragmentInsertion.first.size() != 0)
+		{
+			std::regex rgx("(" + fragmentInsertion.first + ")");
+			fragText = std::regex_replace(fragText, rgx, fragmentInsertion.second);
+		}
 
 		const char* vertText_C = vertText.c_str();
 		const char* fragText_C = fragText.c_str();

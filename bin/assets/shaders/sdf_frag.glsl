@@ -91,14 +91,16 @@ float Tree(vec3 p)
 	return d - 0.06 * cos(q.x * 4.) * cos(q.y * 3.) * cos(q.z * 4.);
 }
 
-float Sdf(vec3 p)
-{
-	p.y -= 20. * cos(p.x * 0.01 + 1.5) * cos(p.z * 0.01 + 1.5);
-	float plane = p.y - 0.2 * sin(p.x) * sin(p.z);
-	float trees = Tree(RepXZ(p-vec3(0.,1.,0.), vec2(40.)));
-	float hills = length(RepXZ(p + vec3(0., 10., 0.), vec2(34.))) - 12.;
-	return SmoothUnion(plane, min(trees, hills), 0.8);
-}
+//float Sdf(vec3 p)
+//{
+//	p.y -= 20. * cos(p.x * 0.01 + 1.5) * cos(p.z * 0.01 + 1.5);
+//	float plane = p.y - 0.2 * sin(p.x) * sin(p.z);
+//	float trees = Tree(RepXZ(p-vec3(0.,1.,0.), vec2(40.)));
+//	float hills = length(RepXZ(p + vec3(0., 10., 0.), vec2(34.))) - 12.;
+//	return SmoothUnion(plane, min(trees, hills), 0.8);
+//}
+
+__SDF__
 
 vec3 CalcNormal(vec3 p)
 {
