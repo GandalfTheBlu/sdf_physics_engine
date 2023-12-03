@@ -185,6 +185,22 @@ void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 			Tolo::Push<float>(vm, Tree(p));
 		}
 	});
+	program.AddFunction({ "vec3", "RepXZ", {"vec3", "float", "float"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 p = Tolo::Pop<glm::vec3>(vm);
+			float x = Tolo::Pop<float>(vm);
+			float y = Tolo::Pop<float>(vm);
+			Tolo::PushStruct<glm::vec3>(vm, RepXZ(p, glm::vec2(x, y)));
+		}
+	});
+	program.AddFunction({ "float", "SmoothUnion", {"float", "float", "float"}, [](Tolo::VirtualMachine& vm)
+		{
+			float a = Tolo::Pop<float>(vm);
+			float b = Tolo::Pop<float>(vm);
+			float k = Tolo::Pop<float>(vm);
+			Tolo::Push<float>(vm, SmoothUnion(a, b, k));
+		}
+	});
 }
 
 void SdfObject::Init(const std::string& vertShaderPath, const std::string& fragShaderPath, const std::string& sdfPath)

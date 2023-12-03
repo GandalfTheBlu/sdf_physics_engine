@@ -42,9 +42,9 @@ float Capsule(vec3 p, vec3 a, vec3 b, float r)
 //	return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.);
 //}
 
-vec3 RepXZ(vec3 p, vec2 s)
+vec3 RepXZ(vec3 p, float x, float y)
 {
-	vec2 q = s * round(p.xz / s);
+	vec2 q = vec2(x, y) * round(p.xz / vec2(x, y));
 	return p - vec3(q.x, 0., q.y);
 }
 
