@@ -5,6 +5,9 @@
 #include "input.h"
 #include "program_handle.h"
 #include "debug.h"
+#include "game_object.h"
+#include "transform.h"
+#include "script_component.h"
 
 static float totalTime = 0.f;
 App_SetupTest* p_currentApp = nullptr;
@@ -147,12 +150,6 @@ void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 			Tolo::Push<Tolo::Float>(vm, glm::length(v));
 		}
 	});
-	program.AddFunction({ "float", "normalize", {"vec3"}, [](Tolo::VirtualMachine& vm)
-		{
-			glm::vec3 v = Tolo::Pop<glm::vec3>(vm);
-			Tolo::PushStruct<glm::vec3>(vm, glm::normalize(v));
-		}
-	});
 	program.AddFunction({ "float", "sin", {"float"}, [](Tolo::VirtualMachine& vm)
 		{
 			float a = Tolo::Pop<float>(vm);
@@ -266,7 +263,7 @@ void App_SetupTest::Init()
 	worldSdfObject.Init("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl", "assets/tolo/test.tolo");
 
 
-	physicsWorld.Init(WorldSDF, { 0.2f, 0.4f });
+	physicsWorld.Init(WorldSDF, { 1.f, 0.4f });
 	physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 	for (size_t i = 0; i < spheres.size(); i++)
@@ -347,6 +344,40 @@ void App_SetupTest::UpdateLoop()
 	bool mouseVisible = false;
 	std::vector<glm::vec4> particles;
 	float particleLifeTime = 1.f;
+
+
+	//
+	
+	GameObject go;
+	go.AddComponent<Transform>();
+	auto sc = go.AddComponent<ScriptComponent>(
+		"assets/tolo/update_test.tolo",
+		std::vector<Tolo::FunctionHandle>{ 
+			{ "void", "UpdatePosition", { "ptr" , "vec3" }, [](Tolo::VirtualMachine& vm) {
+				Tolo::Ptr thisPtr = Tolo::Pop<Tolo::Ptr>(vm);
+				glm::vec3 newPos = Tolo::Pop<glm::vec3>(vm);
+
+				ScriptComponent* p_this = reinterpret_cast<ScriptComponent*>(thisPtr);
+				GameObject& obj = p_this->GetOwner();
+				auto t = obj.GetComponent<Transform>();
+
+				t->position = newPos;
+			}
+		}},
+		std::vector<Tolo::StructHandle>({
+			{"vec3", {
+				{"float", "x"},
+				{"float", "y"},
+				{"float", "z"}
+			}}
+		})
+	);
+
+	go.Update(fixedDeltaTime);
+
+	//
+
+
 
 	while (!window.ShouldClose())
 	{

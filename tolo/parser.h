@@ -65,6 +65,7 @@ namespace Tolo
 		std::map<std::string, DataTypeOperatorFunctions> typeNameToOpFuncs;
 		std::map<std::string, DataTypeNativeOpFuncs> typeNameToNativeOpFuncs;
 		std::map<std::string, StructInfo> typeNameToStructInfo;
+		bool expectTrailingSemicolon;
 
 		Parser();
 

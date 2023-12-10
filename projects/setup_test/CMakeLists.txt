@@ -8,6 +8,14 @@ SET(setup_test_files
 	main.cc
 	app.h
 	app.cc
+	component.h
+	component.cc
+	script_component.h
+	script_component.cc
+	transform.h
+	transform.cc
+	game_object.h
+	game_object.cc
 	player.h
 	player.cc
 )

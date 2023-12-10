@@ -9,6 +9,7 @@ namespace Tolo
 		enum class Type
 		{
 			INVALID,
+			UnconsumedSemicolon,
 			Return,
 			IfSingle,// ifSingle{cond, body[...]}
 			IfChain,// ifChain{cond, body[...], elseIfSingle | elseIfChain | else}

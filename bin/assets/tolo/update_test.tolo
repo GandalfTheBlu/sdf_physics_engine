@@ -1,0 +1,6 @@
+
+
+void Update(ptr this, float deltaTime)
+{
+	UpdatePosition(this, vec3(1., 2., 3.));
+}

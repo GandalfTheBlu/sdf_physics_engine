@@ -709,10 +709,15 @@ namespace Tolo
 
 	LexNode* Lexer::GetPrefix(const std::vector<Token>& tokens, size_t& i)
 	{
-		const Token& token = tokens[i];
 		LexNode* p_result = nullptr;
+		const Token& token = tokens[i];
 
-		if (token.type == Token::Type::ConstChar || token.type == Token::Type::ConstInt || token.type == Token::Type::ConstFloat)
+		if (token.type == Token::Type::Semicolon)
+		{
+			i++;
+			p_result = new LexNode(LexNode::Type::UnconsumedSemicolon, token);
+		}
+		else if (token.type == Token::Type::ConstChar || token.type == Token::Type::ConstInt || token.type == Token::Type::ConstFloat)
 		{
 			i++;
 			p_result = new LexNode(LexNode::Type::LiteralConstant, token);

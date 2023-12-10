@@ -105,7 +105,7 @@ void Player::Update(float deltaTime)
 	{
 		if (p_obj != nullptr)
 		{
-			p_obj->p_rigidbody->AddImpulse(camForward * 4000.f);
+			p_obj->p_rigidbody->AddImpulse(camForward * 8000.f);
 			p_obj = nullptr;
 		}
 		else

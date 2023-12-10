@@ -39,12 +39,14 @@ namespace Tolo
 	{}
 
 	Parser::Parser() :
-		currentFunction(nullptr)
+		currentFunction(nullptr),
+		expectTrailingSemicolon(false)
 	{
 		typeNameToSize["char"] = sizeof(Char);
 		typeNameToSize["int"] = sizeof(Int);
 		typeNameToSize["float"] = sizeof(Float);
 		typeNameToSize["ptr"] = sizeof(Ptr);
+		typeNameToSize["void"] = 0;
 
 		typeNameOperators["char"] =
 		{
@@ -112,6 +114,29 @@ namespace Tolo
 			OpCode::INVALID,
 			OpCode::INVALID,
 			OpCode::Float_Negate,
+			OpCode::INVALID
+		};
+
+		typeNameOperators["ptr"] =
+		{
+			OpCode::Ptr_Add,
+			OpCode::Ptr_Sub,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
+			OpCode::INVALID,
 			OpCode::INVALID
 		};
 
@@ -827,6 +852,9 @@ namespace Tolo
 
 		currentExpectedReturnType = oldRetType;
 
+		if (info.returnTypeName == "void")
+			expectTrailingSemicolon = true;
+
 		return p_call;
 	}
 
@@ -865,6 +893,9 @@ namespace Tolo
 		}
 
 		currentExpectedReturnType = oldRetType;
+
+		if (info.returnTypeName == "void")
+			expectTrailingSemicolon = true;
 
 		return p_call;
 	}
@@ -993,11 +1024,22 @@ namespace Tolo
 		currentFunction = nullptr;
 
 		// check for final return expression
-		Affirm(
-			p_defFunc->body.size() > 0 && p_lexNode->children.back()->type == LexNode::Type::Return,
-			"missing 'return'-statement in function '%s' at line %i",
-			funcName.c_str(), p_lexNode->token.line
-		);
+		if (p_defFunc->body.size() == 0)
+		{
+			Affirm(funcInfo.returnTypeName == "void",
+				"missing 'return'-statement in function '%s' at line %i",
+				funcName.c_str(), p_lexNode->token.line
+			);
+			p_defFunc->body.push_back(new EReturn(0));
+		}
+		else if (p_lexNode->children.back()->type != LexNode::Type::Return)
+		{
+			Affirm(p_defFunc->body.back()->GetDataType() == "void",
+				"missing 'return'-statement in function '%s' at line %i",
+				funcName.c_str(), p_lexNode->token.line
+			);
+			p_defFunc->body.push_back(new EReturn(0));
+		}
 
 		return p_defFunc;
 	}
@@ -1165,8 +1207,16 @@ namespace Tolo
 
 	Expression* Parser::ParseNextExpression(LexNode* p_lexNode)
 	{
+		if (expectTrailingSemicolon)
+		{
+			Affirm(p_lexNode->type == LexNode::Type::UnconsumedSemicolon, "missing ';' at line %i", p_lexNode->token.line);
+			expectTrailingSemicolon = false;
+		}
+
 		switch (p_lexNode->type)
 		{
+		case LexNode::Type::UnconsumedSemicolon:
+			return new EEmpty();
 		case LexNode::Type::LiteralConstant:
 			return ParseLiteralConstant(p_lexNode);
 		case LexNode::Type::VariableLoad:
