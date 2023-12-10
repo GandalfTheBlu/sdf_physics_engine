@@ -17,4 +17,8 @@ public:
 
 	Transform(GameObject* _p_owner);
 	virtual ~Transform();
+
+	virtual void LateUpdate(float deltaTime) override;
+
+	void UpdateMatrix();
 };

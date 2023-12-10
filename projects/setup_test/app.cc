@@ -107,6 +107,48 @@ SdfObject::~SdfObject()
 		delete fileWatchers[i];
 }
 
+namespace ToloFunctions
+{
+	void vec3_operator_plus(Tolo::VirtualMachine& vm)
+	{
+		glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+		glm::vec3 b = Tolo::Pop<glm::vec3>(vm);
+		Tolo::PushStruct<glm::vec3>(vm, a + b);
+	}
+
+	void vec3_operator_minus(Tolo::VirtualMachine& vm)
+	{
+		glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+		glm::vec3 b = Tolo::Pop<glm::vec3>(vm);
+		Tolo::PushStruct<glm::vec3>(vm, a - b);
+	}
+
+	void vec3_operator_negate(Tolo::VirtualMachine& vm)
+	{
+		glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+		Tolo::PushStruct<glm::vec3>(vm, -a);
+	}
+
+	void vec3_operator_mult(Tolo::VirtualMachine& vm)
+	{
+		glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
+		float b = Tolo::Pop<float>(vm);
+		Tolo::PushStruct<glm::vec3>(vm, a * b);
+	}
+
+	void vec3_length(Tolo::VirtualMachine& vm)
+	{
+		glm::vec3 v = Tolo::Pop<glm::vec3>(vm);
+		Tolo::Push<Tolo::Float>(vm, glm::length(v));
+	}
+
+	void float_sin(Tolo::VirtualMachine& vm)
+	{
+		float a = Tolo::Pop<float>(vm);
+		Tolo::Push<float>(vm, glm::sin(a));
+	}
+}
+
 void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 {
 	program.AddStruct({
@@ -117,45 +159,12 @@ void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 			{"float", "z"}
 		}
 	});
-	program.AddFunction({ "vec3", "operator+", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
-		{
-			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
-			glm::vec3 b = Tolo::Pop<glm::vec3>(vm);
-			Tolo::PushStruct<glm::vec3>(vm, a + b);
-		}
-	});
-	program.AddFunction({ "vec3", "operator-", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
-		{
-			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
-			glm::vec3 b = Tolo::Pop<glm::vec3>(vm);
-			Tolo::PushStruct<glm::vec3>(vm, a - b);
-		}
-	});
-	program.AddFunction({ "vec3", "operator-", {"vec3"}, [](Tolo::VirtualMachine& vm)
-		{
-			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
-			Tolo::PushStruct<glm::vec3>(vm, -a);
-		}
-	});
-	program.AddFunction({ "vec3", "operator*", {"vec3", "float"}, [](Tolo::VirtualMachine& vm)
-		{
-			glm::vec3 a = Tolo::Pop<glm::vec3>(vm);
-			float b = Tolo::Pop<float>(vm);
-			Tolo::PushStruct<glm::vec3>(vm, a * b);
-		}
-	});
-	program.AddFunction({ "float", "length", {"vec3"}, [](Tolo::VirtualMachine& vm)
-		{
-			glm::vec3 v = Tolo::Pop<glm::vec3>(vm);
-			Tolo::Push<Tolo::Float>(vm, glm::length(v));
-		}
-	});
-	program.AddFunction({ "float", "sin", {"float"}, [](Tolo::VirtualMachine& vm)
-		{
-			float a = Tolo::Pop<float>(vm);
-			Tolo::Push<float>(vm, glm::sin(a));
-		}
-	});
+	program.AddFunction({ "vec3", "operator+", {"vec3", "vec3"}, ToloFunctions::vec3_operator_plus});
+	program.AddFunction({ "vec3", "operator-", {"vec3", "vec3"}, ToloFunctions::vec3_operator_minus});
+	program.AddFunction({ "vec3", "operator-", {"vec3"}, ToloFunctions::vec3_operator_negate});
+	program.AddFunction({ "vec3", "operator*", {"vec3", "float"}, ToloFunctions::vec3_operator_mult});
+	program.AddFunction({ "float", "length", {"vec3"}, ToloFunctions::vec3_length});
+	program.AddFunction({ "float", "sin", {"float"}, ToloFunctions::float_sin});
 	program.AddFunction({ "float", "cos", {"float"}, [](Tolo::VirtualMachine& vm)
 		{
 			float a = Tolo::Pop<float>(vm);
@@ -349,11 +358,19 @@ void App_SetupTest::UpdateLoop()
 	//
 	
 	GameObject go;
-	go.AddComponent<Transform>();
+	auto tr = go.AddComponent<Transform>();
+	tr->position = glm::vec3(0.f, 3.f, 4.f);
+
 	auto sc = go.AddComponent<ScriptComponent>(
 		"assets/tolo/update_test.tolo",
 		std::vector<Tolo::FunctionHandle>{ 
-			{ "void", "UpdatePosition", { "ptr" , "vec3" }, [](Tolo::VirtualMachine& vm) {
+			{ "vec3", "operator+", { "vec3", "vec3" }, ToloFunctions::vec3_operator_plus},
+			{ "vec3", "operator-", {"vec3", "vec3"}, ToloFunctions::vec3_operator_minus },
+			{ "vec3", "operator-", {"vec3"}, ToloFunctions::vec3_operator_negate },
+			{ "vec3", "operator*", {"vec3", "float"}, ToloFunctions::vec3_operator_mult },
+			{ "float", "length", {"vec3"}, ToloFunctions::vec3_length },
+			{ "float", "sin", {"float"}, ToloFunctions::float_sin },
+			{ "void", "SetPosition", { "ptr" , "vec3" }, [](Tolo::VirtualMachine& vm) {
 				Tolo::Ptr thisPtr = Tolo::Pop<Tolo::Ptr>(vm);
 				glm::vec3 newPos = Tolo::Pop<glm::vec3>(vm);
 
@@ -362,8 +379,17 @@ void App_SetupTest::UpdateLoop()
 				auto t = obj.GetComponent<Transform>();
 
 				t->position = newPos;
-			}
-		}},
+			}},
+			{ "vec3", "GetPosition", { "ptr" }, [](Tolo::VirtualMachine& vm) {
+				Tolo::Ptr thisPtr = Tolo::Pop<Tolo::Ptr>(vm);
+
+				ScriptComponent* p_this = reinterpret_cast<ScriptComponent*>(thisPtr);
+				GameObject& obj = p_this->GetOwner();
+				auto t = obj.GetComponent<Transform>();
+
+				Tolo::PushStruct<glm::vec3>(vm, t->position);
+			}}
+		},
 		std::vector<Tolo::StructHandle>({
 			{"vec3", {
 				{"float", "x"},
@@ -372,8 +398,6 @@ void App_SetupTest::UpdateLoop()
 			}}
 		})
 	);
-
-	go.Update(fixedDeltaTime);
 
 	//
 
@@ -414,6 +438,7 @@ void App_SetupTest::UpdateLoop()
 		}
 		
 		player.Update(fixedDeltaTime);
+		go.Update(fixedDeltaTime);
 
 		glm::mat4 P = player.camera.CalcP();
 		glm::mat4 V = player.camera.CalcV(player.cameraTransform);
@@ -456,6 +481,21 @@ void App_SetupTest::UpdateLoop()
 		glm::vec3 textureScale(1.f);
 		phongShader.SetVec2("u_textureScale", &textureScale[0]);
 		objectTexture.Bind(GL_TEXTURE0);
+		sphereMesh.Bind();
+
+		{
+			const glm::mat4& M = go.GetComponent<Transform>()->matrix;
+			glm::mat4 MVP = VP * M;
+			glm::mat3 N = glm::transpose(glm::inverse(glm::mat3(M)));
+			glm::vec3 color(1.f, 0.9f, 0.9f);
+
+			phongShader.SetMat4("u_MVP", &MVP[0][0]);
+			phongShader.SetMat4("u_M", &M[0][0]);
+			phongShader.SetMat3("u_N", &N[0][0]);
+			phongShader.SetVec3("u_color", &color[0]);
+			phongShader.SetFloat("u_roughness", 0.5f);
+			sphereMesh.Draw(0);
+		}
 
 		for (size_t i = 0; i < spheres.size(); i++)
 		{
@@ -470,10 +510,11 @@ void App_SetupTest::UpdateLoop()
 			phongShader.SetMat3("u_N", &N[0][0]);
 			phongShader.SetVec3("u_color", &color[0]);
 			phongShader.SetFloat("u_roughness", 0.5f);
-			sphereMesh.Bind();
 			sphereMesh.Draw(0);
-			sphereMesh.Unbind();
 		}
+		sphereMesh.Unbind();
+
+		capsuleMesh.Bind();
 		for (size_t i = 0; i < capsules.size(); i++)
 		{
 			glm::mat4 M = glm::mat4(glm::mat3_cast(capsules[i].rb.rotation) * glm::mat3(
@@ -492,10 +533,9 @@ void App_SetupTest::UpdateLoop()
 			phongShader.SetMat3("u_N", &N[0][0]);
 			phongShader.SetVec3("u_color", &color[0]);
 			phongShader.SetFloat("u_roughness", 0.5f);
-			capsuleMesh.Bind();
 			capsuleMesh.Draw(0);
-			capsuleMesh.Unbind();
 		}
+		capsuleMesh.Unbind();
 		objectTexture.Unbind(GL_TEXTURE0);
 		phongShader.StopUsing();
 

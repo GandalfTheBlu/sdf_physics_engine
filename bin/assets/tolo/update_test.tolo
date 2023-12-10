@@ -2,5 +2,7 @@
 
 void Update(ptr this, float deltaTime)
 {
-	UpdatePosition(this, vec3(1., 2., 3.));
+	vec3 pos = GetPosition(this);
+	vec3 vel = vec3(0., 3., 0.);
+	SetPosition(this, pos + vel * deltaTime);
 }
