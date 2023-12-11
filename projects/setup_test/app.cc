@@ -185,6 +185,13 @@ void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 			Tolo::Push<float>(vm, glm::max(a, b));
 		}
 	});
+	program.AddFunction({ "float", "Box", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec3 p = Tolo::Pop<glm::vec3>(vm);
+			glm::vec3 b = Tolo::Pop<glm::vec3>(vm);
+			Tolo::Push<float>(vm, Box(p, b));
+		}
+	});
 	program.AddFunction({ "float", "Tree", {"vec3"}, [](Tolo::VirtualMachine& vm)
 		{
 			glm::vec3 p = Tolo::Pop<glm::vec3>(vm);
@@ -272,7 +279,7 @@ void App_SetupTest::Init()
 	worldSdfObject.Init("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl", "assets/tolo/test.tolo");
 
 
-	physicsWorld.Init(WorldSDF, { 1.f, 0.4f });
+	physicsWorld.Init(WorldSDF, { 0.3f, 0.4f });
 	physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
 
 	for (size_t i = 0; i < spheres.size(); i++)
@@ -413,6 +420,8 @@ void App_SetupTest::UpdateLoop()
 		auto& IP = Engine::Input::Instance();
 		if (IP.GetKey(GLFW_KEY_ESCAPE).WasPressed())
 			window.SetMouseVisible(mouseVisible = !mouseVisible);
+		if (IP.GetKey(GLFW_KEY_END).WasPressed())
+			break;
 
 		physicsWorld.Update(fixedDeltaTime);
 
@@ -459,12 +468,10 @@ void App_SetupTest::UpdateLoop()
 		skyboxTexture.Unbind(GL_TEXTURE0);
 		skyboxShader.StopUsing();
 
-		glm::vec2 nearFar(player.camera.GetNearPlane(), player.camera.GetFarPlane());
-
 		Engine::Shader& sdfShader = worldSdfObject.shader;
 
 		sdfShader.Use();
-		sdfShader.SetVec2("u_nearFar", &nearFar[0]);
+		sdfShader.SetMat4("u_VP", &VP[0][0]);
 		sdfShader.SetMat4("u_invVP", &invVP[0][0]);
 		sdfShader.SetVec3("u_camPos", &player.cameraTransform[3][0]);
 		sdfShader.SetFloat("u_pixelRadius", pixelRadius);

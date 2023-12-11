@@ -86,6 +86,16 @@ void Player::Update(float deltaTime)
 		cameraPitch += (float)mouse.movement.dy * sensitivity * deltaTime;
 	}
 
+	const float keySens = 1.5f;
+	if (IP.GetKey(GLFW_KEY_UP).IsDown())
+		cameraPitch += deltaTime * keySens;
+	if (IP.GetKey(GLFW_KEY_DOWN).IsDown())
+		cameraPitch -= deltaTime * keySens;
+	if (IP.GetKey(GLFW_KEY_LEFT).IsDown())
+		cameraYaw -= deltaTime * keySens;
+	if (IP.GetKey(GLFW_KEY_RIGHT).IsDown())
+		cameraYaw += deltaTime * keySens;
+
 	cameraPitch = glm::clamp(cameraPitch, -1.5f, 1.5f);
 
 	glm::vec3 camPos = GetCameraPos();
@@ -101,7 +111,7 @@ void Player::Update(float deltaTime)
 	static glm::mat4 relativeTransform(1.f);
 	float holdDistance = 10.f;
 
-	if (mouse.leftButton.WasPressed())
+	if (mouse.leftButton.WasPressed() || IP.GetKey(GLFW_KEY_KP_0).WasPressed())
 	{
 		if (p_obj != nullptr)
 		{

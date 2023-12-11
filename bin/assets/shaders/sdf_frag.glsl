@@ -2,7 +2,7 @@
 
 #define MAX_DISTANCE 200.
 
-uniform vec2 u_nearFar;
+uniform mat4 u_VP;
 uniform mat4 u_invVP;
 uniform vec3 u_camPos;
 uniform float u_pixelRadius;
@@ -13,13 +13,14 @@ layout(location=0) in vec2 v_position;
 out vec4 o_color;
 out float gl_FragDepth;
 
-vec3 ScreenRay()
+void ScreenRay(inout vec3 origin, inout vec3 ray)
 {
 	vec4 nearPos = u_invVP * vec4(v_position.x, v_position.y, -1.f, 1.f);
 	vec4 farPos = u_invVP * vec4(v_position.x, v_position.y, 1.f, 1.f);
 	nearPos /= nearPos.w;
 	farPos /= farPos.w;
-	return normalize(vec3(farPos - nearPos));
+	origin = nearPos.xyz;
+	ray = normalize(vec3(farPos - nearPos));
 }
 
 float SmoothUnion(float d1, float d2, float k) 
@@ -36,11 +37,11 @@ float Capsule(vec3 p, vec3 a, vec3 b, float r)
 	return length(pa - ba * h) - r;
 }
 
-//float Box(vec3 p, vec3 b)
-//{
-//	vec3 q = abs(p) - b;
-//	return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.);
-//}
+float Box(vec3 p, vec3 b)
+{
+	vec3 q = abs(p) - b;
+	return length(max(q, 0.)) + min(max(q.x, max(q.y, q.z)), 0.);
+}
 
 vec3 RepXZ(vec3 p, float x, float y)
 {
@@ -132,6 +133,7 @@ float SoftShadow(vec3 origin, vec3 ray, float minT, float maxT, float k)
 float RayMarch(vec3 origin, vec3 ray)
 {
 	const float infinity = 100000.;
+
 	const float minT = 0.3;
 	const float maxT = MAX_DISTANCE;
 	
@@ -182,19 +184,18 @@ float RayMarch(vec3 origin, vec3 ray)
 
 void main()
 {
-	vec3 origin = u_camPos;
-	vec3 ray = ScreenRay();
+	vec3 origin = vec3(0.);
+	vec3 ray = vec3(0.);
+	ScreenRay(origin, ray);
 	float t = RayMarch(origin, ray);
 	
 	if(t >= MAX_DISTANCE)
 		discard;
 	
-	float zNear = u_nearFar.x;
-	float zFar = u_nearFar.y;
-	float lin = t;
-	gl_FragDepth = (1. + (2. * zNear * zFar / lin - zFar - zNear) / (zNear - zFar)) / 2.;
-	
 	vec3 point = origin + ray * t;
+	vec4 clipPoint = u_VP * vec4(point, 1.);
+	gl_FragDepth = (clipPoint.z / clipPoint.w + 1.) * 0.5;
+	
 	vec3 normal = CalcNormal(point);
 	vec3 reflected = reflect(ray, normal);
 	vec3 lightDir = normalize(vec3(0.5, -1., 0.8));

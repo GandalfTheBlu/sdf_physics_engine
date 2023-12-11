@@ -8,5 +8,6 @@ float Sdf(vec3 p)
 	
 	vec3 q = RepXZ(p - vec3(0., 1., 0.), 30., 30.);
 	float tree = Tree(q);
+	
 	return min(plane, tree);
 }
