@@ -165,13 +165,23 @@ void main()
 	vec3 normal = CalcNormal(point);
 	vec3 reflected = reflect(ray, normal);
 	vec3 lightDir = normalize(vec3(0.5, -1., 0.8));
-	vec3 amb = vec3(0.4, 0.4, 0.5);
+	vec3 amb = mix(vec3(0.2, 0.35, 0.43), vec3(0.3, 0.45, 0.63), normal.y * 0.5 + 0.5);
+	
 	float shadow = Shadow(point + normal * 0.01, -lightDir, 0.3, 100.);
 	float diff = max(0., dot(normal, -lightDir));
 	float spec = pow(max(0., dot(reflected, -lightDir)), 16.);
-	vec3 tint = mix(vec3(0.5, 0.4, 0.3), vec3(0.8, 0.8, 1.), min(normal.y, 1.));
+	float shine = 1. - abs(dot(normal, ray));
+	shine *= shine * 0.4;
+	float fade = pow(t / MAX_DISTANCE, 0.8);	
 	
-	vec3 col = tint * (amb + vec3(shadow * (diff + spec)));
+	float pattern = sin(point.x * 2.) * sin(point.z * 2.) * (1. - max(normal.y, 0.));
+	pattern *= pattern;
+	pattern = 2. * pow(max(normal.y - pattern, 0.), 0.5);
+	vec3 tint = clamp(mix(vec3(0.5, 0.4, 0.3), vec3(0.8, 0.8, 1.), pattern), vec3(0.), vec3(1.));
+	
+	vec3 col = tint * (amb + vec3(shine + shadow * (spec + diff)));
+	
+	col = mix(col, amb, fade);
 	
 	o_color = vec4(col, 1.);
 }

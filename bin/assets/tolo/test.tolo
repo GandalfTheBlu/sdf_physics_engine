@@ -3,15 +3,11 @@
 float Sdf(vec3 p)
 {
 	float plane = p.y - 0.5 * cos(p.x * 0.3) * sin(p.z * 0.3);
-	vec3 q2 = RepXZ(p - vec3(20., -9., 20.), 15., 35.);
-	plane = SmoothUnion(plane, length(q2) - 11., 0.8);
+	vec3 q0 = RepXZ(p - vec3(20., -9., 20.), 36., 31.);
+	plane = SmoothUnion(plane, length(q0) - 11., 0.8);
 	
-	vec3 q = RepXZ(p - vec3(0., 1., 0.), 30., 30.);
+	vec3 q = RepXZ(p - vec3(0., 1., 0.), 33., 33.);
 	float tree = Tree(q);
-	
-	//float tree = length(q) - 2.;
-	//tree = abs(tree) - 0.2;
-	//tree = max(tree, p.y - 2.);
 	
 	return min(plane, tree);
 }

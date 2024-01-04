@@ -23,7 +23,7 @@ public:
 
 	Engine::Window window;
 	Tolo::ProgramHandle* p_worldSdfProgram;
-	Engine::FileWatcher sdfFileWatcher;
+	Engine::FileWatcher sdfFileWatchers[3];
 	SdfRenderer sdfRenderer;
 	Engine::PhysicsWorld physicsWorld;
 	Player player;

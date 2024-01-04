@@ -214,7 +214,7 @@ void App_SetupTest::ReloadWorldSdf()
 	std::string sdfCode;
 	try
 	{
-		p_newProgram = new Tolo::ProgramHandle(sdfFileWatcher.filePath, 1024, "Sdf");
+		p_newProgram = new Tolo::ProgramHandle(sdfFileWatchers[0].filePath, 1024, "Sdf");
 		InitSdfProgram(*p_newProgram);
 		p_newProgram->Compile(sdfCode);
 	}
@@ -234,8 +234,14 @@ void App_SetupTest::ReloadWorldSdf()
 
 void App_SetupTest::UpdateSdfFileWatcher()
 {
-	if (sdfFileWatcher.NewVersionAvailable())
-		ReloadWorldSdf();
+	for (size_t i = 0; i < 3; i++)
+	{
+		if (sdfFileWatchers[i].NewVersionAvailable())
+		{
+			ReloadWorldSdf();
+			return;
+		}
+	}
 }
 
 
@@ -252,7 +258,9 @@ void App_SetupTest::Init()
 	window.SetMouseVisible(false);
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
 
-	sdfFileWatcher.Init("assets/tolo/test.tolo");
+	sdfFileWatchers[0].Init("assets/tolo/test.tolo");
+	sdfFileWatchers[1].Init("assets/shaders/sdf_color_pass_frag.glsl");
+	sdfFileWatchers[2].Init("assets/shaders/sdf_cone_pass_frag.glsl");
 	sdfRenderer.Init(window.Width(), window.Height());
 	ReloadWorldSdf();
 
