@@ -25,6 +25,8 @@ SET(engine_files
 	camera.cc
 	sdf.h
 	sdf.cc
+	sdf_renderer.h
+	sdf_renderer.cc
 	hit_result.h
 	collider.h
 	collider.cc

@@ -68,7 +68,7 @@ void Player::Update(float deltaTime)
 
 	rigidbody.linearVelocity = ClampMagnitude(move, 1.f) * movementSpeed + glm::vec3(0.f, velY, 0.f);
 
-	if (IP.GetKey(GLFW_KEY_SPACE).WasPressed() && IsOnGround())
+	if (IP.GetKey(GLFW_KEY_SPACE).WasPressed()&& IsOnGround())
 	{
 		rigidbody.linearVelocity.y = glm::sqrt(2.f * 9.82f * jumpHeight);
 		rigidbody.centerOfMass.y += 0.4f;

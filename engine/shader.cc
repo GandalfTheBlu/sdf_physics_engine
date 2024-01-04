@@ -62,7 +62,7 @@ namespace Engine
 			glGetShaderInfoLog(vertexShader, shaderLogSize, NULL, errorMessage.get());
 			std::string errMsgStr;
 			FormatErrorLog(errorMessage.get(), errMsgStr);
-			Affirm(false, "failed to compile vertex shader:", errMsgStr);
+			Affirm(false, "failed to compile vertex shader '", vertexFilePath, "': ", errMsgStr);
 		}
 
 		// create and compile fragment shader
@@ -78,7 +78,7 @@ namespace Engine
 			glGetShaderInfoLog(fragmentShader, shaderLogSize, NULL, errorMessage.get());
 			std::string errMsgStr;
 			FormatErrorLog(errorMessage.get(), errMsgStr);
-			Affirm(false, "failed to compile fragment shader:", errMsgStr);
+			Affirm(false, "failed to compile fragment shader '", fragmentFilePath, "': ", errMsgStr);
 		}
 
 		// create and link program
@@ -92,7 +92,7 @@ namespace Engine
 		{
 			std::unique_ptr<char[]> errorMessage(new char[shaderLogSize]);
 			glGetProgramInfoLog(newProgram, shaderLogSize, NULL, errorMessage.get());
-			Affirm(false, "failed to link program:\n\t", errorMessage.get());
+			Affirm(false, "failed to link program '", vertexFilePath, ", ", fragmentFilePath, "': ", errorMessage.get());
 		}
 
 		// clean up

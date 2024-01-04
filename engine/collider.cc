@@ -39,8 +39,14 @@ namespace Engine
 		if (dist > radius)
 			return false;
 
-		outHitReslut.normal = CalcNormal(otherSDF, position);
-		outHitReslut.point = position - outHitReslut.normal * dist;
+		glm::vec3 normal = CalcNormal(otherSDF, position);
+		glm::vec3 point = position - normal * dist;
+
+		if (otherSDF(point) > 0.1f)
+			return false;
+
+		outHitReslut.normal = normal;
+		outHitReslut.point = point;
 		outHitReslut.distance = radius - dist;// distance = overlap
 
 		return true;
@@ -125,8 +131,15 @@ namespace Engine
 		if (!hit)
 			return false;
 
-		outHitReslut.normal = CalcNormal(otherSDF, closestPoint);
-		outHitReslut.point = closestPoint - outHitReslut.normal * closestDist;
+		glm::vec3 normal = CalcNormal(otherSDF, closestPoint);
+		glm::vec3 point = closestPoint - normal * closestDist;
+
+		if (otherSDF(point) > 0.1f)
+			return false;
+
+		outHitReslut.normal = normal;
+		outHitReslut.point = point;
+
 		outHitReslut.distance = -sdf(outHitReslut.point);// distance = overlap
 
 		return true;

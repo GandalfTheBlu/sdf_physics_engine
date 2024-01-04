@@ -52,7 +52,7 @@ float Tree(glm::vec3 p)
 	glm::vec3 scale = glm::vec3(1.f);
 	glm::vec3 change = glm::vec3(0.7f, 0.68f, 0.7f);
 
-	glm::vec3 n1 = normalize(glm::vec3(1.f + 0.1f * glm::cos(totalTime), 0.f, 1.f));
+	glm::vec3 n1 = normalize(glm::vec3(1.f, 0.f, 1.f));
 	glm::vec3 n2 = glm::vec3(n1.x, 0.f, -n1.z);
 	glm::vec3 n3 = glm::vec3(-n1.x, 0.f, n1.z);
 
@@ -88,23 +88,7 @@ float WorldSDF(const glm::vec3& p)
 	//float hills = glm::length(RepXZ(q + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
 	//return SmoothUnion(plane, glm::min(trees, hills), 0.8f);
 
-	return p_currentApp->worldSdfObject.p_program->Execute<float>(p);
-}
-
-
-SdfObject::SdfObject() :
-	p_program(nullptr)
-{
-	for (size_t i = 0; i < fileWatchers.size(); i++)
-		fileWatchers[i] = new Engine::FileWatcher();
-}
-
-SdfObject::~SdfObject()
-{
-	delete p_program;
-	
-	for (size_t i = 0; i < fileWatchers.size(); i++)
-		delete fileWatchers[i];
+	return p_currentApp->p_worldSdfProgram->Execute<float>(p);
 }
 
 namespace ToloFunctions
@@ -149,7 +133,7 @@ namespace ToloFunctions
 	}
 }
 
-void SdfObject::InitProgram(Tolo::ProgramHandle& program)
+void InitSdfProgram(Tolo::ProgramHandle& program)
 {
 	program.AddStruct({
 		"vec3",
@@ -185,6 +169,12 @@ void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 			Tolo::Push<float>(vm, glm::max(a, b));
 		}
 	});
+	program.AddFunction({ "float", "abs", {"float"}, [](Tolo::VirtualMachine& vm)
+		{
+			float a = Tolo::Pop<float>(vm);
+			Tolo::Push<float>(vm, glm::abs(a));
+		}
+	});
 	program.AddFunction({ "float", "Box", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
 		{
 			glm::vec3 p = Tolo::Pop<glm::vec3>(vm);
@@ -216,16 +206,7 @@ void SdfObject::InitProgram(Tolo::ProgramHandle& program)
 	});
 }
 
-void SdfObject::Init(const std::string& vertShaderPath, const std::string& fragShaderPath, const std::string& sdfPath)
-{
-	fileWatchers[0]->Init(vertShaderPath);
-	fileWatchers[1]->Init(fragShaderPath);
-	fileWatchers[2]->Init(sdfPath);
-
-	Reload();
-}
-
-void SdfObject::Reload()
+void App_SetupTest::ReloadWorldSdf()
 {
 	Engine::Info("compiling sdf object");
 
@@ -233,8 +214,8 @@ void SdfObject::Reload()
 	std::string sdfCode;
 	try
 	{
-		p_newProgram = new Tolo::ProgramHandle(fileWatchers[2]->filePath, 1024, "Sdf");
-		InitProgram(*p_newProgram);
+		p_newProgram = new Tolo::ProgramHandle(sdfFileWatcher.filePath, 1024, "Sdf");
+		InitSdfProgram(*p_newProgram);
 		p_newProgram->Compile(sdfCode);
 	}
 	catch (const Tolo::Error& error)
@@ -245,26 +226,21 @@ void SdfObject::Reload()
 		return;
 	}
 
-	shader.Reload(fileWatchers[0]->filePath, fileWatchers[1]->filePath, { "__SDF__", sdfCode });
+	sdfRenderer.Reload(sdfCode);
 
-	delete p_program;
-	p_program = p_newProgram;
+	delete p_worldSdfProgram;
+	p_worldSdfProgram = p_newProgram;
 }
 
-void SdfObject::Update()
+void App_SetupTest::UpdateSdfFileWatcher()
 {
-	for (size_t i = 0; i < fileWatchers.size(); i++)
-	{
-		if (fileWatchers[i]->NewVersionAvailable())
-		{
-			Reload();
-			break;
-		}
-	}
+	if (sdfFileWatcher.NewVersionAvailable())
+		ReloadWorldSdf();
 }
 
 
-App_SetupTest::App_SetupTest()
+App_SetupTest::App_SetupTest() :
+	p_worldSdfProgram(nullptr)
 {}
 
 void App_SetupTest::Init()
@@ -276,8 +252,9 @@ void App_SetupTest::Init()
 	window.SetMouseVisible(false);
 	glClearColor(0.1f, 0.1f, 0.1f, 0.f);
 
-	worldSdfObject.Init("assets/shaders/sdf_vert.glsl", "assets/shaders/sdf_frag.glsl", "assets/tolo/test.tolo");
-
+	sdfFileWatcher.Init("assets/tolo/test.tolo");
+	sdfRenderer.Init(window.Width(), window.Height());
+	ReloadWorldSdf();
 
 	physicsWorld.Init(WorldSDF, { 0.3f, 0.4f });
 	physicsWorld.gravity = glm::vec3(0.f, -9.82f, 0.f);
@@ -415,7 +392,7 @@ void App_SetupTest::UpdateLoop()
 		totalTime += fixedDeltaTime;
 		window.BeginUpdate();
 
-		worldSdfObject.Update();
+		UpdateSdfFileWatcher();
 
 		auto& IP = Engine::Input::Instance();
 		if (IP.GetKey(GLFW_KEY_ESCAPE).WasPressed())
@@ -468,18 +445,19 @@ void App_SetupTest::UpdateLoop()
 		skyboxTexture.Unbind(GL_TEXTURE0);
 		skyboxShader.StopUsing();
 
-		Engine::Shader& sdfShader = worldSdfObject.shader;
-
-		sdfShader.Use();
-		sdfShader.SetMat4("u_VP", &VP[0][0]);
-		sdfShader.SetMat4("u_invVP", &invVP[0][0]);
-		sdfShader.SetVec3("u_camPos", &player.cameraTransform[3][0]);
-		sdfShader.SetFloat("u_pixelRadius", pixelRadius);
-		sdfShader.SetFloat("u_time", totalTime);
-		screenQuad.Bind();
-		screenQuad.Draw(0);
-		screenQuad.Unbind();
-		sdfShader.StopUsing();
+		//Engine::Shader& sdfShader = worldSdfObject.shader;
+		//
+		//sdfShader.Use();
+		//sdfShader.SetMat4("u_VP", &VP[0][0]);
+		//sdfShader.SetMat4("u_invVP", &invVP[0][0]);
+		//sdfShader.SetVec3("u_camPos", &player.cameraTransform[3][0]);
+		//sdfShader.SetFloat("u_pixelRadius", pixelRadius);
+		//sdfShader.SetFloat("u_time", totalTime);
+		//screenQuad.Bind();
+		//screenQuad.Draw(0);
+		//screenQuad.Unbind();
+		//sdfShader.StopUsing();
+		sdfRenderer.Draw(player.camera, player.cameraTransform, WorldSDF);
 
 
 		phongShader.Use();
