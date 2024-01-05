@@ -72,7 +72,7 @@ namespace Engine
 		}
 	}
 
-	void SdfRenderer::Draw(Camera& camera, const glm::mat4& cameraTransform, const SDF& sdf)
+	void SdfRenderer::Draw(Camera& camera, const glm::mat4& cameraTransform, float time)
 	{
 		glm::mat4 VP = camera.CalcP() * camera.CalcV(cameraTransform);
 		glm::mat4 invVP = glm::inverse(VP);
@@ -89,6 +89,7 @@ namespace Engine
 		conePassShader.Use();
 		conePassShader.SetMat4("u_invVP", &invVP[0][0]);
 		conePassShader.SetInt("u_isFirstPass", 1);
+		conePassShader.SetFloat("u_time", time);
 
 		for (size_t i=0; i<renderTargets.size(); i++)
 		{
@@ -117,6 +118,7 @@ namespace Engine
 		colorPassShader.Use();
 		colorPassShader.SetMat4("u_VP", &VP[0][0]);
 		colorPassShader.SetMat4("u_invVP", &invVP[0][0]);
+		colorPassShader.SetFloat("u_time", time);
 
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, renderTargets.back().distanceTexture);

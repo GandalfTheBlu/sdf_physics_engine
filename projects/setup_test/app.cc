@@ -45,14 +45,15 @@ float Capsule(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, float 
 	return glm::length(pa - ba * h) - r;
 }
 
-float Tree(glm::vec3 p)
+glm::vec2 Tree(glm::vec3 p)
 {
 	glm::vec2 dim = glm::vec2(1.f, 8.f);
 	float d = Capsule(p, glm::vec3(0.f, -1.f, 0.f), glm::vec3(0.f, 1.f + dim.y, 0.f), dim.x);
 	glm::vec3 scale = glm::vec3(1.f);
 	glm::vec3 change = glm::vec3(0.7f, 0.68f, 0.7f);
+	float itr = 0.f;
 
-	glm::vec3 n1 = normalize(glm::vec3(1.f, 0.f, 1.f));
+	glm::vec3 n1 = normalize(glm::vec3(1.f, 0.f, 1.f + 0.1 * glm::cos(totalTime)));
 	glm::vec3 n2 = glm::vec3(n1.x, 0.f, -n1.z);
 	glm::vec3 n3 = glm::vec3(-n1.x, 0.f, n1.z);
 
@@ -67,28 +68,21 @@ float Tree(glm::vec3 p)
 		p = RotX(p, 3.1415f * 0.25f);
 		scale *= change;
 
-		d = glm::min(d, Capsule(p, glm::vec3(0.f), glm::vec3(0.f, dim.y * scale.y, 0.), scale.x * dim.x));
+		float d2 = Capsule(p, glm::vec3(0.f), glm::vec3(0.f, dim.y * scale.y, 0.), scale.x * dim.x);
+
+		if (d2 < d)
+		{
+			d = d2;
+			itr = (float)i;
+		}
 	}
 
-	return d;
-}
-
-float SmoothUnion(float d1, float d2, float k)
-{
-	float h = glm::clamp(0.5f + 0.5f * (d2 - d1) / k, 0.f, 1.f);
-	return glm::mix(d2, d1, h) - k * h * (1.f - h);
+	return glm::vec2(itr / 7.f, d);
 }
 
 float WorldSDF(const glm::vec3& p)
 {
-	//glm::vec3 q = p;
-	//q.y -= 20. * cos(q.x * 0.01 + 1.5) * cos(q.z * 0.01 + 1.5);
-	//float plane = q.y - 0.2f * glm::sin(q.x) * glm::sin(q.z);
-	//float trees = Tree(RepXZ(q - glm::vec3(0.f, 1.f, 0.f), glm::vec2(40.f)));
-	//float hills = glm::length(RepXZ(q + glm::vec3(0.f, 10.f, 0.f), glm::vec2(34.f))) - 12.f;
-	//return SmoothUnion(plane, glm::min(trees, hills), 0.8f);
-
-	return p_currentApp->p_worldSdfProgram->Execute<float>(p);
+	return p_currentApp->p_worldSdfProgram->Execute<glm::vec4>(p).w;
 }
 
 namespace ToloFunctions
@@ -136,11 +130,27 @@ namespace ToloFunctions
 void InitSdfProgram(Tolo::ProgramHandle& program)
 {
 	program.AddStruct({
+		"vec2",
+		{
+			{"float", "x"},
+			{"float", "y"}
+		}
+	});
+	program.AddStruct({
 		"vec3",
 		{
 			{"float", "x"},
 			{"float", "y"},
 			{"float", "z"}
+		}
+	});
+	program.AddStruct({
+		"vec4",
+		{
+			{"float", "x"},
+			{"float", "y"},
+			{"float", "z"},
+			{"float", "w"}
 		}
 	});
 	program.AddFunction({ "vec3", "operator+", {"vec3", "vec3"}, ToloFunctions::vec3_operator_plus});
@@ -155,24 +165,38 @@ void InitSdfProgram(Tolo::ProgramHandle& program)
 			Tolo::Push<float>(vm, glm::cos(a));
 		}
 	});
-	program.AddFunction({ "float", "min", {"float", "float"}, [](Tolo::VirtualMachine& vm)
+	program.AddFunction({ "vec4", "Union", {"vec4", "vec4"}, [](Tolo::VirtualMachine& vm)
 		{
-			float a = Tolo::Pop<float>(vm);
-			float b = Tolo::Pop<float>(vm);
-			Tolo::Push<float>(vm, glm::min(a, b));
+			glm::vec4 a = Tolo::Pop<glm::vec4>(vm);
+			glm::vec4 b = Tolo::Pop<glm::vec4>(vm);
+
+			if (a.w < b.w)
+				Tolo::PushStruct<glm::vec4>(vm, a);
+			else
+				Tolo::PushStruct<glm::vec4>(vm, b);
 		} 
 	});
-	program.AddFunction({ "float", "max", {"float", "float"}, [](Tolo::VirtualMachine& vm)
+	program.AddFunction({ "vec4", "Cut", {"vec4", "vec4"}, [](Tolo::VirtualMachine& vm)
 		{
-			float a = Tolo::Pop<float>(vm);
-			float b = Tolo::Pop<float>(vm);
-			Tolo::Push<float>(vm, glm::max(a, b));
+			glm::vec4 a = Tolo::Pop<glm::vec4>(vm);
+			glm::vec4 b = Tolo::Pop<glm::vec4>(vm);
+			b.w = -b.w;
+
+			if (a.w > b.w)
+				Tolo::PushStruct<glm::vec4>(vm, a);
+			else
+				Tolo::PushStruct<glm::vec4>(vm, b);
 		}
 	});
-	program.AddFunction({ "float", "abs", {"float"}, [](Tolo::VirtualMachine& vm)
+	program.AddFunction({ "vec4", "Intersect", {"vec4", "vec4"}, [](Tolo::VirtualMachine& vm)
 		{
-			float a = Tolo::Pop<float>(vm);
-			Tolo::Push<float>(vm, glm::abs(a));
+			glm::vec4 a = Tolo::Pop<glm::vec4>(vm);
+			glm::vec4 b = Tolo::Pop<glm::vec4>(vm);
+
+			if (a.w > b.w)
+				Tolo::PushStruct<glm::vec4>(vm, a);
+			else
+				Tolo::PushStruct<glm::vec4>(vm, b);
 		}
 	});
 	program.AddFunction({ "float", "Box", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
@@ -182,10 +206,10 @@ void InitSdfProgram(Tolo::ProgramHandle& program)
 			Tolo::Push<float>(vm, Box(p, b));
 		}
 	});
-	program.AddFunction({ "float", "Tree", {"vec3"}, [](Tolo::VirtualMachine& vm)
+	program.AddFunction({ "vec2", "Tree", {"vec3"}, [](Tolo::VirtualMachine& vm)
 		{
 			glm::vec3 p = Tolo::Pop<glm::vec3>(vm);
-			Tolo::Push<float>(vm, Tree(p));
+			Tolo::PushStruct<glm::vec2>(vm, Tree(p));
 		}
 	});
 	program.AddFunction({ "vec3", "RepXZ", {"vec3", "float", "float"}, [](Tolo::VirtualMachine& vm)
@@ -196,12 +220,9 @@ void InitSdfProgram(Tolo::ProgramHandle& program)
 			Tolo::PushStruct<glm::vec3>(vm, RepXZ(p, glm::vec2(x, y)));
 		}
 	});
-	program.AddFunction({ "float", "SmoothUnion", {"float", "float", "float"}, [](Tolo::VirtualMachine& vm)
+	program.AddFunction({ "float", "Time", {}, [](Tolo::VirtualMachine& vm)
 		{
-			float a = Tolo::Pop<float>(vm);
-			float b = Tolo::Pop<float>(vm);
-			float k = Tolo::Pop<float>(vm);
-			Tolo::Push<float>(vm, SmoothUnion(a, b, k));
+			Tolo::Push<float>(vm, totalTime);
 		}
 	});
 }
@@ -453,19 +474,7 @@ void App_SetupTest::UpdateLoop()
 		skyboxTexture.Unbind(GL_TEXTURE0);
 		skyboxShader.StopUsing();
 
-		//Engine::Shader& sdfShader = worldSdfObject.shader;
-		//
-		//sdfShader.Use();
-		//sdfShader.SetMat4("u_VP", &VP[0][0]);
-		//sdfShader.SetMat4("u_invVP", &invVP[0][0]);
-		//sdfShader.SetVec3("u_camPos", &player.cameraTransform[3][0]);
-		//sdfShader.SetFloat("u_pixelRadius", pixelRadius);
-		//sdfShader.SetFloat("u_time", totalTime);
-		//screenQuad.Bind();
-		//screenQuad.Draw(0);
-		//screenQuad.Unbind();
-		//sdfShader.StopUsing();
-		sdfRenderer.Draw(player.camera, player.cameraTransform, WorldSDF);
+		sdfRenderer.Draw(player.camera, player.cameraTransform, totalTime);
 
 
 		phongShader.Use();

@@ -1,5 +1,4 @@
 #pragma once
-#include "sdf.h"
 #include "shader.h"
 #include "render_mesh.h"
 #include <array>
@@ -33,6 +32,6 @@ namespace Engine
 		
 		void Init(int windowWidth, int windowHeight);
 		void Reload(const std::string& sdfCode);
-		void Draw(class Camera& camera, const glm::mat4& cameraTransform, const SDF& sdf);
+		void Draw(class Camera& camera, const glm::mat4& cameraTransform, float time);
 	};
 }
