@@ -2,7 +2,7 @@
 
 vec4 Sdf(vec3 p)
 {
-	float plane = p.y - 0.5 * cos(p.x * 0.3 + Time()) * sin(p.z * 0.3);
+	float plane = p.y;
 	
 	vec3 q = RepXZ(p - vec3(0., 1., 0.), 33., 33.);
 	vec2 tree = Tree(q);
@@ -10,8 +10,9 @@ vec4 Sdf(vec3 p)
 	float scale = 0.3;
 	float noise = 0.7 + 0.3 * cos(p.x * scale) * cos(p.y * scale) * cos(p.z * scale);
 	
-	return Union(
-		vec4(0.4, 0.4 + p.y * 0.3, 0.2, plane), 
-		vec4(0.6, 0.3 + 0.7 * tree.x * noise, 0.2, tree.y)
+	return SmoothUnion(
+		vec4(0.4, 0.4, 0.2, plane), 
+		vec4(0.6 + 0.4 * tree.x, 0.3 + 0.7 * tree.x * noise, 0.2 + 0.8 * tree.x, tree.y),
+		1.8
 	);
 }

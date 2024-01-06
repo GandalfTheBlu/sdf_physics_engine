@@ -42,8 +42,8 @@ namespace Engine
 		glm::vec3 normal = CalcNormal(otherSDF, position);
 		glm::vec3 point = position - normal * dist;
 
-		if (otherSDF(point) > 0.1f)
-			return false;
+		//if (otherSDF(point) > 0.1f)
+		//	return false;
 
 		outHitReslut.normal = normal;
 		outHitReslut.point = point;
@@ -134,8 +134,8 @@ namespace Engine
 		glm::vec3 normal = CalcNormal(otherSDF, closestPoint);
 		glm::vec3 point = closestPoint - normal * closestDist;
 
-		if (otherSDF(point) > 0.1f)
-			return false;
+		//if (otherSDF(point) > 0.1f)
+		//	return false;
 
 		outHitReslut.normal = normal;
 		outHitReslut.point = point;

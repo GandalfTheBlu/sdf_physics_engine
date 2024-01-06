@@ -199,6 +199,17 @@ void InitSdfProgram(Tolo::ProgramHandle& program)
 				Tolo::PushStruct<glm::vec4>(vm, b);
 		}
 	});
+	program.AddFunction({ "vec4", "SmoothUnion", {"vec4", "vec4", "float"}, [](Tolo::VirtualMachine& vm)
+		{
+			glm::vec4 a = Tolo::Pop<glm::vec4>(vm);
+			glm::vec4 b = Tolo::Pop<glm::vec4>(vm);
+			float k = Tolo::Pop<float>(vm);
+
+			float h = glm::clamp(0.5f + 0.5f * (b.w - a.w) / k, 0.f, 1.f);
+			glm::vec4 d = glm::mix(b, a, h);
+			Tolo::PushStruct<glm::vec4>(vm, glm::vec4(glm::vec3(d), d.w - (k * h * (1.f - h))));
+		}
+	});
 	program.AddFunction({ "float", "Box", {"vec3", "vec3"}, [](Tolo::VirtualMachine& vm)
 		{
 			glm::vec3 p = Tolo::Pop<glm::vec3>(vm);

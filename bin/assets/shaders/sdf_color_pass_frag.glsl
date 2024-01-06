@@ -47,6 +47,13 @@ vec4 Intersect(vec4 a, vec4 b)
 	return b;
 }
 
+vec4 SmoothUnion(vec4 d1, vec4 d2, float k)
+{
+    float h = clamp(0.5 + 0.5 * (d2.w - d1.w) / k, 0., 1.);
+	vec4 d = mix(d2, d1, h);
+    return vec4(d.xyz, d.w - (k * h * (1. - h)));
+}
+
 vec3 RepXZ(vec3 p, float x, float y)
 {
 	vec2 q = vec2(x, y) * round(p.xz / vec2(x, y));
@@ -168,6 +175,20 @@ float Shadow(vec3 origin, vec3 ray, float minT, float maxT)
     return 1.;
 }
 
+float AmbientOcclusion(vec3 origin, vec3 norm, float minT, float maxT, float power)
+{
+	float t = minT;
+	float ao = 1.;
+	
+	for(int i=0; i<10 && t < maxT; i++)
+	{
+		float r = Sdf(origin + norm * t).w;
+		ao = min(ao, r / t);
+		t *= power;
+	}
+	
+	return max(0., ao);
+}
 
 void main()
 {
@@ -189,18 +210,23 @@ void main()
 	vec3 normal = CalcNormal(point);
 	vec3 reflected = reflect(ray, normal);
 	vec3 lightDir = normalize(vec3(0.5, -1., 0.8));
-	vec3 amb = mix(vec3(0.3, 0.45, 0.2), vec3(0.3, 0.45, 0.63), normal.y * 0.5 + 0.5);
+	vec3 amb = mix(vec3(0.3, 0.3, 0.4), vec3(0.3, 0.45, 0.63), normal.y * 0.5 + 0.5);
+	vec3 lightCol = vec3(1., 0.95, 0.8);
 	
 	float shadow = Shadow(point + normal * 0.01, -lightDir, 0.3, 100.);
+	shadow *= AmbientOcclusion(point, normal, 0.05, 0.5, 1.2);
 	float diff = max(0., dot(normal, -lightDir));
-	float spec = pow(max(0., dot(reflected, -lightDir)), 16.);
-	float shine = 1. - abs(dot(normal, ray));
-	shine *= shine * 0.4;
-	float fade = pow(t / MAX_DISTANCE, 0.8);	
+	float spec = pow(max(0., dot(reflected, -lightDir)), 8.);
+	float fade = pow(t / MAX_DISTANCE, 0.9);	
 	
-	vec3 col = albedo * (amb + vec3(shine + shadow * (spec + diff)));
+	float snow = 0.2 * (0.5 + 0.5 * cos(point.x * 6.) * cos(point.z * 6.));
+	if(normal.y > snow)
+	{
+		albedo = mix(albedo, vec3(1.), pow(normal.y - snow, 0.4));
+	}
 	
-	col = mix(col, amb, fade);
+	vec3 col = albedo * (lightCol * shadow * (diff + spec) + 0.4 * amb);
+	col = mix(min(col, vec3(1.)), amb, fade);
 	//col = amb;
 	o_color = vec4(col, 1.);
 }

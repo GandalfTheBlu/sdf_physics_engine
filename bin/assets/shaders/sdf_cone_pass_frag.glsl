@@ -49,6 +49,13 @@ vec4 Intersect(vec4 a, vec4 b)
 	return b;
 }
 
+vec4 SmoothUnion(vec4 d1, vec4 d2, float k)
+{
+    float h = clamp(0.5 + 0.5 * (d2.w - d1.w) / k, 0., 1.);
+	vec4 d = mix(d2, d1, h);
+    return vec4(d.xyz, d.w - (k * h * (1. - h)));
+}
+
 vec3 RepXZ(vec3 p, float x, float y)
 {
 	vec2 q = vec2(x, y) * round(p.xz / vec2(x, y));
