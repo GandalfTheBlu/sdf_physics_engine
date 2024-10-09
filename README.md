@@ -1,0 +1,3 @@
+A 3D physics engine where dynamic spheres and capsules can interact with a world defined through analytical SDF:s. The SDF:s are defined through code in my custom scripting language - Tolo. Since Tolo shares syntax with GLSL, the SDF code can be directly inserted into the rendering shaders. Thanks to the Tolo virtual machine, the physics engine can evaluate the SDF:s in real-time to compute collisions.
+
+The rendering is a mix of regular static meshes and sphere tracing for the SDF:s. The sphere tracing algorithm uses the optimizations proposed in https://www.researchgate.net/publication/329152815_Accelerating_Sphere_Tracing.
